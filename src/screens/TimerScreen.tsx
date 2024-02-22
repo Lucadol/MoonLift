@@ -1,6 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-const TimerScreen = () => {
+//React Navigation
+import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { RootStackParamList } from '../../App'
+
+type TimerProps = NativeStackScreenProps<RootStackParamList, 'Timer'>
+
+const TimerScreen = ({navigation}: TimerProps) => {
   return (
     <View style={styles.container}>
     <Text style={styles.title}>Chrono</Text>
@@ -8,7 +14,10 @@ const TimerScreen = () => {
       <Pressable style={[styles.button, styles.amrap]}>
         <Text style={styles.buttonText}>AMRAP</Text>
       </Pressable>
-      <Pressable style={[styles.button, styles.emom]}>
+      <Pressable
+        style={[styles.button, styles.emom]}
+        onPress={() => navigation.navigate('Emom')}
+      >
         <Text style={styles.buttonText}>EMOM</Text>
       </Pressable>
       <Pressable style={[styles.button, styles.tabata]}>

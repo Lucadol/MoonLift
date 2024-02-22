@@ -10,11 +10,13 @@ import { createStackNavigator } from '@react-navigation/stack';
 import Home from './src/Home';
 import TimerScreen from './src/screens/TimerScreen';
 import FollowupScreen from './src/screens/FollowupScreen';
+import EmomScreen from './src/screens/timerScreens/EmomScreen';
 
 export type RootStackParamList = {
   Home: undefined
   Timer: undefined
   Followup: undefined
+  Emom: undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -47,6 +49,19 @@ export default function App() {
         <Stack.Screen 
           name="Followup"
           component={FollowupScreen} 
+          options={{
+            headerTitle: '',
+            headerBackTitleVisible: false,
+            headerTintColor: 'white',
+            headerStyle: {
+              backgroundColor: '#000',
+              elevation: 0,
+            }
+          }}
+        />
+        <Stack.Screen
+          name="Emom"
+          component={EmomScreen}
           options={{
             headerTitle: '',
             headerBackTitleVisible: false,

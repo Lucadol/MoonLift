@@ -5,10 +5,14 @@ const FollowupScreen = () => {
     <View style={styles.container}>
     <Text style={styles.title}>Suivi</Text>
     <View style={styles.contentContainer}>
-      <Pressable style={[styles.button, styles.seances]}>
+      <Pressable 
+        style={[styles.button, styles.seances]}
+      >
         <Text style={styles.buttonText}>SEANCES</Text>
       </Pressable>
-      <Pressable style={[styles.button, styles.reps]}>
+      <Pressable 
+        style={[styles.button, styles.reps]}
+      >
         <Text style={styles.buttonText}>REPETITIONS</Text>
       </Pressable>
     </View>
@@ -23,6 +27,7 @@ const styles = StyleSheet.create({
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
+      marginBottom: 100,
     },
     title: {
       fontSize: 30,

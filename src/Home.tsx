@@ -4,9 +4,6 @@ import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../App'
 
-import TimerScreen from './screens/TimerScreen'
-import FollowupScreen from './screens/FollowupScreen'
-
 type HomeProps = NativeStackScreenProps<RootStackParamList, 'Home'>
 
 const Home = ({navigation}: HomeProps) => {
