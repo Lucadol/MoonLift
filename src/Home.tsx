@@ -4,8 +4,8 @@ import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParamList } from '../App'
 
-import TimerScreen from './TimerScreen'
-import FollowupScreen from './FollowupScreen'
+import TimerScreen from './screens/TimerScreen'
+import FollowupScreen from './screens/FollowupScreen'
 
 type HomeProps = NativeStackScreenProps<RootStackParamList, 'Home'>
 
@@ -36,7 +36,6 @@ export default Home
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#000',
         alignItems: 'center',
         justifyContent: 'center',
       },

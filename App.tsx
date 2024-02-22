@@ -1,26 +1,30 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 
 //Navigation
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createStackNavigator } from '@react-navigation/stack';
 // import { createDrawerNavigator } from '@react-navigation/drawer';
 
 //Screen
-import Home from './screens/Home';
-import TimerScreen from './screens/TimerScreen';
-import FollowupScreen from './screens/FollowupScreen';
+import Home from './src/Home';
+import TimerScreen from './src/screens/TimerScreen';
+import FollowupScreen from './src/screens/FollowupScreen';
 
 export type RootStackParamList = {
-  Timer: undefined;
-  Followup: undefined;
+  Home: undefined
+  Timer: undefined
+  Followup: undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const colorScheme = useColorScheme()
+  const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={theme}>
       <Stack.Navigator>
         <Stack.Screen
           name="Home"
