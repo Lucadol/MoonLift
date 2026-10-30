@@ -8,6 +8,7 @@ import { RootStackParamList } from '../../../App'
 import Button from '../../components/Button'
 import Card from '../../components/Card'
 import Mascot from '../../components/mascot/Mascot'
+import ProgressChart from '../../components/ProgressChart'
 import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
 import { onColor } from '../../theme/palettes'
@@ -15,6 +16,8 @@ import { makeStyles, useTheme } from '../../theme/ThemeContext'
 import { formatRecordValue, groupRecords } from '../../utils/records'
 
 type RecordDetailProps = StackScreenProps<RootStackParamList, 'RecordDetail'>
+
+const percentages = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
 
 const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
   const { movementKey } = route.params
@@ -45,6 +48,35 @@ const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
         </View>
         <Mascot pose="flex" size={110} onBackground={theme.colors.tertiary} />
       </View>
+
+      {summary.history.filter(r => r.unit === summary.best.unit).length > 1 && (
+        <>
+          <Text style={common.sectionTitle}>Progression</Text>
+          <Card>
+            <ProgressChart records={summary.history.filter(r => r.unit === summary.best.unit)} />
+          </Card>
+        </>
+      )}
+
+      {(summary.best.unit === 'kg' || summary.best.unit === 'lb') && (
+        <>
+          <Text style={common.sectionTitle}>Charges de travail</Text>
+          <Card style={styles.percentGrid}>
+            {percentages.map(pct => {
+              const step = summary.best.unit === 'kg' ? 0.5 : 1
+              const load = Math.round((summary.best.value * pct) / 100 / step) * step
+              return (
+                <View key={pct} style={styles.percentCell}>
+                  <Text style={styles.percentLabel}>{pct} %</Text>
+                  <Text style={styles.percentValue}>
+                    {load} {summary.best.unit}
+                  </Text>
+                </View>
+              )
+            })}
+          </Card>
+        </>
+      )}
 
       <Text style={common.sectionTitle}>Historique</Text>
       {summary.history.map(record => {
@@ -124,6 +156,29 @@ const useStyles = makeStyles(({ colors, fonts }) => {
     },
     rowBody: {
       flex: 1,
+    },
+    percentGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingVertical: 10,
+    },
+    percentCell: {
+      width: '50%',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 7,
+      paddingHorizontal: 8,
+    },
+    percentLabel: {
+      fontFamily: fonts.medium,
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+    percentValue: {
+      fontFamily: fonts.display,
+      fontSize: 15,
+      color: colors.text,
+      fontVariant: ['tabular-nums'],
     },
   }
 })

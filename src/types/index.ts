@@ -24,6 +24,7 @@ export interface Exercise {
   completed: boolean
   result?: string
   completedAt?: string
+  historyId?: string // entrée d'historique créée à la validation
 }
 
 export interface Session {
@@ -56,4 +57,15 @@ export interface PersonalRecord {
   unit: RecordUnit
   date: string // YYYY-MM-DD
   notes: string
+}
+
+// ---- Historique ----
+
+export interface HistoryEntry {
+  id: string
+  date: string // ISO
+  kind: 'exercise' | 'timer'
+  title: string // nom de l'exercice ou du timer
+  subtitle?: string // programme · séance
+  result?: string
 }

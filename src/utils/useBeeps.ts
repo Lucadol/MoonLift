@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef } from 'react'
 import { Vibration } from 'react-native'
 import { Audio } from 'expo-av'
 
+import { useThemeContext } from '../theme/ThemeContext'
+
 type Beep = 'short' | 'long'
 
-// Charge les bips une seule fois par écran et les joue avec une vibration
+// Charge les bips une seule fois par écran et les joue avec une vibration (désactivables dans les réglages)
 export const useBeeps = () => {
+  const { settings } = useThemeContext()
+  const enabled = settings.sounds
   const sounds = useRef<Partial<Record<Beep, Audio.Sound>>>({})
 
   useEffect(() => {
@@ -35,8 +39,12 @@ export const useBeeps = () => {
     }
   }, [])
 
-  return useCallback((beep: Beep) => {
-    Vibration.vibrate(beep === 'long' ? 500 : 100)
-    sounds.current[beep]?.replayAsync().catch(() => {})
-  }, [])
+  return useCallback(
+    (beep: Beep) => {
+      if (!enabled) return
+      Vibration.vibrate(beep === 'long' ? 500 : 100)
+      sounds.current[beep]?.replayAsync().catch(() => {})
+    },
+    [enabled],
+  )
 }

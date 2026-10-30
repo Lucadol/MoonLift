@@ -11,7 +11,10 @@ import Mascot from './components/mascot/Mascot'
 import { PoseName } from './components/mascot/figure'
 import ProgressBar from './components/ProgressBar'
 import { useCommonStyles } from './components/styles'
+import { APP_NAME, APP_TAGLINE } from './constants/app'
+import { useLaunchQuote } from './constants/quotes'
 import { useStore } from './store/StoreContext'
+import { weekStreak } from './utils/history'
 import { makeStyles, useTheme } from './theme/ThemeContext'
 import { mix } from './theme/palettes'
 
@@ -22,7 +25,10 @@ const Home = ({navigation}: HomeProps) => {
   const common = useCommonStyles()
   const styles = useStyles()
   const insets = useSafeAreaInsets()
-  const { programs, records } = useStore()
+  const { programs, records, history } = useStore()
+  const quote = useLaunchQuote()
+  const streak = weekStreak(history)
+  const [brand, ...brandRest] = APP_NAME.split(' ')
 
   // Séance à reprendre : la première séance entamée mais pas terminée, sinon la première non terminée
   const resume = useMemo(() => {
@@ -50,6 +56,12 @@ const Home = ({navigation}: HomeProps) => {
       onPress: () => navigation.navigate('Programs'),
     },
     {
+      title: 'Historique',
+      description: streak > 0 ? `🔥 ${streak} semaine${streak > 1 ? 's' : ''} d’affilée` : 'Ton calendrier d’entraînement',
+      pose: 'wave',
+      onPress: () => navigation.navigate('History'),
+    },
+    {
       title: 'Mes PR',
       description: records.length ? `${records.length} record${records.length > 1 ? 's' : ''} enregistrés` : 'Suis tes records personnels',
       pose: 'trophy',
@@ -60,16 +72,25 @@ const Home = ({navigation}: HomeProps) => {
   return (
     <ScrollView style={common.screen} contentContainerStyle={[common.content, { paddingTop: insets.top + 12 }]}>
       <View style={styles.topBar}>
-        <Text style={common.eyebrow}>Bonjour 👋</Text>
+        <Text style={styles.hello}>Bonjour {theme.mode === 'dark' ? '🌙' : '☀️'}</Text>
         <Pressable onPress={() => navigation.navigate('Settings')} hitSlop={10} accessibilityRole="button">
-          <Text style={common.link}>Apparence</Text>
+          <Text style={common.link}>Réglages</Text>
         </Pressable>
       </View>
 
       <View style={styles.hero}>
         <Mascot pose="overhead" size={190} backdrop />
-        <Text style={styles.brand}>MoonLift</Text>
-        <Text style={styles.tagline}>Timer · Programme · Records</Text>
+        <Text style={styles.brand}>
+          {brand}
+          {brandRest.length > 0 && <Text style={styles.brandAccent}> {brandRest.join(' ')}</Text>}
+        </Text>
+        <Text style={styles.tagline}>{APP_TAGLINE}</Text>
+        {quote && (
+          <View style={styles.bubble}>
+            <View style={styles.bubbleTail} />
+            <Text style={styles.quote}>{`«\u00A0${quote}\u00A0»`}</Text>
+          </View>
+        )}
       </View>
 
       {resume && (
@@ -119,12 +140,49 @@ const useStyles = makeStyles(({ colors, fonts }) => ({
     marginTop: 12,
     marginBottom: 28,
   },
+  hello: {
+    fontFamily: fonts.semibold,
+    fontSize: 15,
+    color: colors.text,
+  },
   brand: {
     fontFamily: fonts.display,
     fontSize: 44,
     letterSpacing: -1.5,
     color: colors.text,
     marginTop: 8,
+  },
+  brandAccent: {
+    color: colors.primary,
+  },
+  bubble: {
+    marginTop: 18,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    maxWidth: 340,
+  },
+  bubbleTail: {
+    position: 'absolute',
+    top: -7,
+    alignSelf: 'center',
+    width: 12,
+    height: 12,
+    backgroundColor: colors.surface,
+    borderLeftWidth: 1,
+    borderTopWidth: 1,
+    borderColor: colors.border,
+    transform: [{ rotate: '45deg' }],
+  },
+  quote: {
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.text,
+    textAlign: 'center',
   },
   tagline: {
     fontFamily: fonts.medium,

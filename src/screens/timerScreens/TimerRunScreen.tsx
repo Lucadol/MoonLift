@@ -5,8 +5,10 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 //React Navigation
 import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../../App'
+import { SegmentType } from '../../types'
 
 import Button from '../../components/Button'
+import LoadHints from '../../components/LoadHints'
 import Mascot from '../../components/mascot/Mascot'
 import { PoseName } from '../../components/mascot/figure'
 import ProgressBar from '../../components/ProgressBar'
@@ -25,6 +27,8 @@ import {
   totalDurationSec,
 } from '../../utils/timer'
 import { useBeeps } from '../../utils/useBeeps'
+import { useExerciseValidation } from '../../utils/useExerciseValidation'
+import { useVoice } from '../../utils/useVoice'
 
 type TimerRunProps = StackScreenProps<RootStackParamList, 'TimerRun'>
 
@@ -35,12 +39,22 @@ const TICK_MS = 100
 
 const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`
 
+const spokenLabels: Record<SegmentType, string> = {
+  AMRAP: 'AMRAP',
+  EMOM: 'EMOM',
+  TABATA: 'Tabata',
+  FOR_TIME: 'For time',
+  REST: 'Repos',
+}
+
 const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
   const { config, exerciseRef } = route.params
   const theme = useTheme()
   const styles = useStyles()
-  const { programs, completeExercise } = useStore()
+  const { programs, logTimer } = useStore()
   const beep = useBeeps()
+  const speak = useVoice()
+  const { validate: validateExercise, modal: newRecordModal } = useExerciseValidation()
 
   const exercise = useMemo(() => {
     if (!exerciseRef) return undefined
@@ -101,9 +115,13 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
       setElapsedMs(accumulatedMs.current)
       setStatus('finished')
       beep('long')
-      setResult(buildResult(reachedSegment))
+      speak('Terminé, bravo !')
+      const text = buildResult(reachedSegment)
+      setResult(text)
+      // Un timer libre (hors programme) est ajouté à l'historique s'il a vraiment servi
+      if (!exerciseRef && accumulatedMs.current - PREP_MS >= 30 * 1000) logTimer(config, text)
     },
-    [beep, buildResult],
+    [beep, speak, buildResult, exerciseRef, logTimer, config],
   )
 
   // Saute directement au début d'une phase (fin d'un For Time, repos écourté)
@@ -140,10 +158,28 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
     lastBeepKey.current = key
     if (previousPhase !== '' && previousPhase !== phaseKey) {
       beep('long')
+      speak(announcePhase(previousPhase === 'prep' ? -1 : parseInt(previousPhase, 10)))
     } else if (remainingSec <= 3) {
       beep('short')
+    } else if (!inPrep) {
+      const durationSec = snapshot.phase.durationSec
+      if (durationSec >= 180 && remainingSec === 60) speak('Plus qu’une minute !')
+      else if (durationSec >= 240 && remainingSec === Math.ceil(durationSec / 2)) speak('Mi-parcours, tiens bon !')
     }
-  }, [status, elapsedMs, inPrep, snapshot, finish, beep, segments.length])
+  }, [status, elapsedMs, inPrep, snapshot, finish, beep, speak, segments.length])
+
+  // Annonce vocale au début d'une phase
+  function announcePhase(previousIndex: number) {
+    const current = snapshot.phase
+    const previous = previousIndex >= 0 ? phases[previousIndex] : undefined
+    const newSegment = !previous || previous.segmentIndex !== current.segmentIndex
+    if (current.kind === 'rest') return 'Repos'
+    let text = ''
+    if (isMix && newSegment) text = `Bloc ${current.segmentIndex + 1}, ${spokenLabels[current.segmentType]}. `
+    if (newSegment) return `${text}C'est parti !`
+    if (current.totalRounds > 1 && current.round === current.totalRounds) return 'Dernier tour !'
+    return current.segmentType === 'EMOM' ? `Tour ${current.round}` : 'Go !'
+  }
 
   // Garde l'écran allumé pendant le timer
   useEffect(() => {
@@ -179,6 +215,7 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
     setRounds({})
     setResult('')
     setStatus('running')
+    speak('Prépare-toi, dix secondes.')
   }
 
   const pause = () => {
@@ -202,9 +239,8 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
   }
 
   const validate = () => {
-    if (!exerciseRef) return
-    completeExercise(exerciseRef, result)
-    navigation.goBack()
+    if (!exerciseRef || !exercise) return
+    validateExercise(exerciseRef, exercise.name, result, () => navigation.goBack())
   }
 
   // ---- Affichage ----
@@ -308,6 +344,15 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
             <Text style={[styles.detailsText, { color: foreground }]}>{exercise.details}</Text>
           </View>
         )}
+        {exercise && status !== 'finished' && (
+          <LoadHints
+            name={exercise.name}
+            details={exercise.details}
+            color={foreground}
+            background={started ? soft : theme.colors.surface}
+            style={styles.loads}
+          />
+        )}
 
         {status === 'ready' && <Button title="Démarrer" size="lg" color={theme.timer[config.type]} onPress={start} />}
 
@@ -383,6 +428,7 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
           </View>
         )}
       </ScrollView>
+      {newRecordModal}
     </KeyboardAvoidingView>
   )
 }
@@ -480,6 +526,10 @@ const useStyles = makeStyles(({ colors, fonts }) => ({
   },
   controls: {
     gap: 12,
+  },
+  loads: {
+    marginTop: -8,
+    marginBottom: 16,
   },
   row: {
     flexDirection: 'row',

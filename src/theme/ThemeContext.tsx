@@ -13,6 +13,8 @@ export type ModeSetting = ColorMode | 'system'
 export interface ThemeSettings {
   paletteId: PaletteId
   mode: ModeSetting
+  voice: boolean // annonces vocales pendant le timer
+  sounds: boolean // bips et vibrations
 }
 
 export const fonts = {
@@ -33,20 +35,31 @@ export interface Theme {
   fonts: typeof fonts
 }
 
-// Couleurs de la mascotte posée sur un fond coloré (ex : écran du timer)
-export const mascotColorsOn = (background: string): Record<ColorRole, string> => {
-  const ink = onColor(background)
+// Couleurs de Moony : corps clair cerné d'encre, identique en thème clair et sombre
+export const buildMascotColors = (accents: Accents, backdrop: string): Record<ColorRole, string> => {
+  const ink = '#2B2622'
+  const fill = '#FFFDF8'
   return {
     ink,
-    far: mix(ink, background, 0.55),
-    moon: ink,
-    moonShade: mix(ink, background, 0.6),
-    accent: mix(ink, background, 0.35),
-    gold: mix(ink, background, 0.35),
+    fill,
+    farFill: mix(fill, ink, 0.13),
+    moon: accents.moon,
+    band: accents.secondary !== accents.moon ? accents.secondary : accents.quaternary,
+    shoe: accents.primary,
+    accent: accents.secondary,
+    gold: accents.tertiary,
+    cheek: mix(accents.moon, '#FFFFFF', 0.35),
+    sweat: mix(accents.quaternary, '#FFFFFF', 0.45),
     shadow: ink,
-    backdrop: mix(background, ink, 0.1),
+    backdrop,
   }
 }
+
+// Moony posé sur un fond coloré (ex : écran du timer)
+export const mascotColorsOn = (theme: Theme, background: string): Record<ColorRole, string> => ({
+  ...theme.mascot,
+  backdrop: mix(background, onColor(background), 0.12),
+})
 
 export const buildTheme = (paletteId: PaletteId, mode: ColorMode): Theme => {
   const palette = palettes.find(p => p.id === paletteId) ?? palettes[0]
@@ -66,16 +79,7 @@ export const buildTheme = (paletteId: PaletteId, mode: ColorMode): Theme => {
       REST: base.textMuted,
     },
     phase: { prep: accents.tertiary, work: accents.primary, rest: accents.quaternary },
-    mascot: {
-      ink: base.text,
-      far: mix(base.text, base.background, 0.62),
-      moon: accents.moon,
-      moonShade: mix(accents.moon, base.surface, 0.72),
-      accent: accents.secondary,
-      gold: accents.tertiary,
-      shadow: base.text,
-      backdrop: base.surfaceAlt,
-    },
+    mascot: buildMascotColors(accents, base.surfaceAlt),
     fonts,
   }
 }
@@ -85,13 +89,14 @@ interface ThemeContextValue {
   settings: ThemeSettings
   setPalette: (paletteId: PaletteId) => void
   setMode: (mode: ModeSetting) => void
+  updateSettings: (patch: Partial<ThemeSettings>) => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
 export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const systemScheme = useColorScheme()
-  const [settings, setSettings] = useState<ThemeSettings>({ paletteId: 'terracotta', mode: 'light' })
+  const [settings, setSettings] = useState<ThemeSettings>({ paletteId: 'terracotta', mode: 'light', voice: true, sounds: true })
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
@@ -111,7 +116,12 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
   const setPalette = useCallback((paletteId: PaletteId) => setSettings(prev => ({ ...prev, paletteId })), [])
   const setMode = useCallback((m: ModeSetting) => setSettings(prev => ({ ...prev, mode: m })), [])
 
-  const value = useMemo(() => ({ theme, settings, setPalette, setMode }), [theme, settings, setPalette, setMode])
+  const updateSettings = useCallback((patch: Partial<ThemeSettings>) => setSettings(prev => ({ ...prev, ...patch })), [])
+
+  const value = useMemo(
+    () => ({ theme, settings, setPalette, setMode, updateSettings }),
+    [theme, settings, setPalette, setMode, updateSettings],
+  )
 
   // Évite un flash du mauvais thème au démarrage
   if (!loaded) return null

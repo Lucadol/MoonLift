@@ -8,7 +8,9 @@ import { RootStackParamList } from '../../../App'
 import Button from '../../components/Button'
 import Card from '../../components/Card'
 import InputModal from '../../components/InputModal'
+import LoadHints from '../../components/LoadHints'
 import ProgressBar from '../../components/ProgressBar'
+import RestTimerModal from '../../components/RestTimerModal'
 import ScreenHeader from '../../components/ScreenHeader'
 import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
@@ -16,7 +18,8 @@ import { onColor } from '../../theme/palettes'
 import { makeStyles, useTheme } from '../../theme/ThemeContext'
 import { Exercise, ExerciseRef } from '../../types'
 import { confirmAction } from '../../utils/helpers'
-import { describeTimer } from '../../utils/timer'
+import { describeTimer, parseRestSec } from '../../utils/timer'
+import { useExerciseValidation } from '../../utils/useExerciseValidation'
 
 type SessionProps = StackScreenProps<RootStackParamList, 'Session'>
 
@@ -32,9 +35,10 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
     deleteSession,
     resetSession,
     moveExercise,
-    completeExercise,
     uncompleteExercise,
   } = useStore()
+  const { validate, modal: newRecordModal } = useExerciseValidation()
+  const [resting, setResting] = useState<Exercise | null>(null)
   const [isRenameVisible, setIsRenameVisible] = useState(false)
   const [toValidate, setToValidate] = useState<Exercise | null>(null)
 
@@ -128,6 +132,7 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
                   </View>
                 )}
                 {!!exercise.details && <Text style={styles.details}>{exercise.details}</Text>}
+                {!exercise.completed && <LoadHints name={exercise.name} details={exercise.details} />}
                 {!!exercise.result && (
                   <View style={styles.result}>
                     <Text style={styles.resultText}>{exercise.result}</Text>
@@ -146,6 +151,14 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
                   }
                 >
                   <Text style={[styles.startButtonText, { color: onColor(timerColor) }]}>▶ Lancer</Text>
+                </Pressable>
+              )}
+              {!exercise.timer && !exercise.completed && (
+                <Pressable
+                  style={({ pressed }) => [styles.restButton, pressed && { opacity: 0.75 }]}
+                  onPress={() => setResting(exercise)}
+                >
+                  <Text style={styles.restButtonText}>⏱ Repos</Text>
                 </Pressable>
               )}
               <View style={styles.spacer} />
@@ -196,9 +209,16 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
         submitLabel="✓ Valider"
         submitColor={theme.colors.success}
         required={false}
-        onSubmit={result => toValidate && completeExercise(refOf(toValidate), result)}
+        onSubmit={result => toValidate && validate(refOf(toValidate), toValidate.name, result)}
         onClose={() => setToValidate(null)}
       />
+      <RestTimerModal
+        visible={resting !== null}
+        exerciseName={resting?.name ?? ''}
+        defaultSec={(resting && parseRestSec(`${resting.name}\n${resting.details}`)) || 120}
+        onClose={() => setResting(null)}
+      />
+      {newRecordModal}
     </ScrollView>
   )
 }
@@ -293,6 +313,18 @@ const useStyles = makeStyles(({ colors, fonts }) => ({
     borderRadius: 18,
     paddingVertical: 8,
     paddingHorizontal: 16,
+  },
+  restButton: {
+    borderRadius: 18,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderWidth: 1.5,
+    borderColor: colors.quaternary,
+  },
+  restButtonText: {
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    color: colors.quaternary,
   },
   startButtonText: {
     fontFamily: fonts.semibold,

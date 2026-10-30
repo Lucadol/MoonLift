@@ -181,3 +181,15 @@ export const describeTimer = (config: TimerConfig | MixSegment): string => {
       )}`
   }
 }
+
+// Repos indiqué dans le texte d'un exercice (« repos 2' », « rest 90s », « récup 1:30 »)
+export const parseRestSec = (text: string): number | undefined => {
+  const match = text.match(/(?:repos|rest|r[ée]cup(?:[ée]ration)?)\D{0,6}(\d+)(?:[:'’](\d{2}))?\s*(min|mn|'|’|s|sec)?/i)
+  if (!match) return undefined
+  const value = parseInt(match[1], 10)
+  if (match[2]) return value * 60 + parseInt(match[2], 10)
+  const unit = match[3]?.toLowerCase()
+  if (unit === 's' || unit === 'sec') return value
+  if (unit) return value * 60
+  return value >= 15 ? value : value * 60 // « repos 90 » = 90 s, « repos 2 » = 2 min
+}

@@ -1,4 +1,4 @@
-# Versions de MoonLift
+# Versions de Moony WOD
 
 Chaque itération est enregistrée dans un commit identifié. Pour revenir à une version précédente :
 
@@ -13,6 +13,7 @@ git revert <commit>
 
 | Itération | Commit | Contenu |
 |-----------|--------|---------|
-| v2 – Design, Mix & import | dernier commit de la branche | Thème clair beige / sombre, 4 palettes au choix, polices Space Grotesk + Inter, mascotte « Moony » sur chaque écran et nouveau logo, timer MIX, import de programme par copier-coller |
+| v3 – Moony vivant & suivi | dernier commit de la branche | Nom « Moony WOD », Moony redessiné (visage, bandeau, animation), phrase de motivation à l'ouverture, charges calculées depuis les PR, détection de nouveau PR, historique et calendrier, graphique de progression, annonces vocales, sauvegarde / restauration, minuteur de repos |
+| v2 – Design, Mix & import | `1a37c51` | Thème clair beige / sombre, 4 palettes au choix, polices Space Grotesk + Inter, mascotte « Moony » sur chaque écran et nouveau logo, timer MIX, import de programme par copier-coller |
 | v1 – Timers, programme & PR | `ad89d9a` | Timers AMRAP / EMOM / Tabata / For Time, programme avec validation des exercices, records personnels |
 | v0 – Version de départ | `6a64388` | Accueil, navigation, page EMOM |

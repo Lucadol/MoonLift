@@ -7,6 +7,7 @@ import { RootStackParamList } from '../../../App'
 
 import Button from '../../components/Button'
 import Card from '../../components/Card'
+import Mascot from '../../components/mascot/Mascot'
 import ScreenHeader from '../../components/ScreenHeader'
 import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
@@ -40,11 +41,14 @@ const RecordsScreen = ({ navigation }: RecordsProps) => {
       )}
 
       {movements.length === 0 && (
-        <Card>
-          <Text style={common.cardTitle}>Aucun record pour l’instant</Text>
-          <Text style={common.cardText}>
-            Ajoute tes PR (1RM, benchmarks, max reps…) pour suivre ta progression mouvement par mouvement.
-          </Text>
+        <Card style={styles.card}>
+          <Mascot pose="sleep" size={84} />
+          <View style={styles.cardBody}>
+            <Text style={common.cardTitle}>Aucun record pour l’instant</Text>
+            <Text style={common.cardText}>
+              Moony fait la sieste. Réveille-le avec ton premier PR (1RM, benchmark, max reps…).
+            </Text>
+          </View>
         </Card>
       )}
 

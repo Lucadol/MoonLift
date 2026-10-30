@@ -25,6 +25,7 @@ import RecordsScreen from './src/screens/recordScreens/RecordsScreen';
 import RecordDetailScreen from './src/screens/recordScreens/RecordDetailScreen';
 import RecordEditScreen from './src/screens/recordScreens/RecordEditScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import HistoryScreen from './src/screens/HistoryScreen';
 
 export type RootStackParamList = {
   Home: undefined
@@ -40,6 +41,7 @@ export type RootStackParamList = {
   RecordDetail: { movementKey: string }
   RecordEdit: { recordId?: string; movement?: string }
   Settings: undefined
+  History: undefined
 }
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -88,6 +90,7 @@ const Navigation = () => {
         <Stack.Screen name="RecordDetail" component={RecordDetailScreen} />
         <Stack.Screen name="RecordEdit" component={RecordEditScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="History" component={HistoryScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   )

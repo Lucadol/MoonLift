@@ -1,19 +1,32 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import { Exercise, ExerciseRef, PersonalRecord, Program, Session } from '../types'
+import { Exercise, ExerciseRef, HistoryEntry, PersonalRecord, Program, Session, TimerConfig } from '../types'
 import { uid } from '../utils/helpers'
 import { ParsedSession } from '../utils/importProgram'
+import { describeTimer } from '../utils/timer'
 
 const PROGRAMS_KEY = 'moonlift:programs'
 const RECORDS_KEY = 'moonlift:records'
+const HISTORY_KEY = 'moonlift:history'
 
-export type ExerciseInput = Omit<Exercise, 'id' | 'completed' | 'result' | 'completedAt'>
+export type ExerciseInput = Omit<Exercise, 'id' | 'completed' | 'result' | 'completedAt' | 'historyId'>
+
+// Format du fichier de sauvegarde
+export interface BackupData {
+  app: 'moony'
+  version: 1
+  exportedAt: string
+  programs: Program[]
+  records: PersonalRecord[]
+  history: HistoryEntry[]
+}
 
 interface Store {
   loaded: boolean
   programs: Program[]
   records: PersonalRecord[]
+  history: HistoryEntry[]
   // Programmes
   addProgram: (name: string) => string
   renameProgram: (programId: string, name: string) => void
@@ -35,6 +48,11 @@ interface Store {
   // Records
   saveRecord: (record: Omit<PersonalRecord, 'id'> & { id?: string }) => void
   deleteRecord: (recordId: string) => void
+  // Historique et sauvegarde
+  logTimer: (config: TimerConfig, result?: string) => void
+  deleteHistoryEntry: (entryId: string) => void
+  exportData: () => BackupData
+  importData: (data: unknown) => void // lève une erreur si le fichier n'est pas valide
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -65,16 +83,19 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   const [loaded, setLoaded] = useState(false)
   const [programs, setPrograms] = useState<Program[]>([])
   const [records, setRecords] = useState<PersonalRecord[]>([])
+  const [history, setHistory] = useState<HistoryEntry[]>([])
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [rawPrograms, rawRecords] = await Promise.all([
+        const [rawPrograms, rawRecords, rawHistory] = await Promise.all([
           AsyncStorage.getItem(PROGRAMS_KEY),
           AsyncStorage.getItem(RECORDS_KEY),
+          AsyncStorage.getItem(HISTORY_KEY),
         ])
         if (rawPrograms) setPrograms(JSON.parse(rawPrograms))
         if (rawRecords) setRecords(JSON.parse(rawRecords))
+        if (rawHistory) setHistory(JSON.parse(rawHistory))
       } catch (e) {
         console.warn('Impossible de charger les données', e)
       } finally {
@@ -92,6 +113,10 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (loaded) AsyncStorage.setItem(RECORDS_KEY, JSON.stringify(records)).catch(console.warn)
   }, [loaded, records])
+
+  useEffect(() => {
+    if (loaded) AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history)).catch(console.warn)
+  }, [loaded, history])
 
   const addProgram = useCallback((name: string) => {
     const id = uid()
@@ -152,6 +177,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
             completed: false,
             result: undefined,
             completedAt: undefined,
+            historyId: undefined,
           })),
         }
         const sessions = [...p.sessions]
@@ -171,7 +197,13 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     setPrograms(prev =>
       mapSession(prev, programId, sessionId, s => ({
         ...s,
-        exercises: s.exercises.map(e => ({ ...e, completed: false, result: undefined, completedAt: undefined })),
+        exercises: s.exercises.map(e => ({
+          ...e,
+          completed: false,
+          result: undefined,
+          completedAt: undefined,
+          historyId: undefined,
+        })),
       })),
     )
   }, [])
@@ -212,21 +244,81 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     )
   }, [])
 
-  const completeExercise = useCallback((ref: ExerciseRef, result?: string) => {
-    setPrograms(prev =>
-      mapExercise(prev, ref, e => ({
-        ...e,
-        completed: true,
-        result: result?.trim() || undefined,
-        completedAt: new Date().toISOString(),
-      })),
-    )
+  const completeExercise = useCallback(
+    (ref: ExerciseRef, result?: string) => {
+      const program = programs.find(p => p.id === ref.programId)
+      const session = program?.sessions.find(s => s.id === ref.sessionId)
+      const exercise = session?.exercises.find(e => e.id === ref.exerciseId)
+      if (!program || !session || !exercise) return
+      const now = new Date().toISOString()
+      const cleanResult = result?.trim() || undefined
+      const entry: HistoryEntry = {
+        id: uid(),
+        date: now,
+        kind: 'exercise',
+        title: exercise.name,
+        subtitle: `${program.name} · ${session.name}`,
+        result: cleanResult,
+      }
+      setHistory(prev => [...prev.filter(h => h.id !== exercise.historyId), entry])
+      setPrograms(prev =>
+        mapExercise(prev, ref, e => ({ ...e, completed: true, result: cleanResult, completedAt: now, historyId: entry.id })),
+      )
+    },
+    [programs],
+  )
+
+  // Décocher un exercice retire aussi l'entrée d'historique (c'était sans doute une erreur)
+  const uncompleteExercise = useCallback(
+    (ref: ExerciseRef) => {
+      const historyId = programs
+        .find(p => p.id === ref.programId)
+        ?.sessions.find(s => s.id === ref.sessionId)
+        ?.exercises.find(e => e.id === ref.exerciseId)?.historyId
+      if (historyId) setHistory(prev => prev.filter(h => h.id !== historyId))
+      setPrograms(prev =>
+        mapExercise(prev, ref, e => ({
+          ...e,
+          completed: false,
+          result: undefined,
+          completedAt: undefined,
+          historyId: undefined,
+        })),
+      )
+    },
+    [programs],
+  )
+
+  const logTimer = useCallback((config: TimerConfig, result?: string) => {
+    setHistory(prev => [
+      ...prev,
+      { id: uid(), date: new Date().toISOString(), kind: 'timer', title: describeTimer(config), result: result?.trim() || undefined },
+    ])
   }, [])
 
-  const uncompleteExercise = useCallback((ref: ExerciseRef) => {
-    setPrograms(prev =>
-      mapExercise(prev, ref, e => ({ ...e, completed: false, result: undefined, completedAt: undefined })),
-    )
+  const deleteHistoryEntry = useCallback((entryId: string) => {
+    setHistory(prev => prev.filter(h => h.id !== entryId))
+  }, [])
+
+  const exportData = useCallback(
+    (): BackupData => ({ app: 'moony', version: 1, exportedAt: new Date().toISOString(), programs, records, history }),
+    [programs, records, history],
+  )
+
+  const importData = useCallback((data: unknown) => {
+    const backup = data as Partial<BackupData> | null
+    if (
+      !backup ||
+      backup.app !== 'moony' ||
+      !Array.isArray(backup.programs) ||
+      !Array.isArray(backup.records) ||
+      !Array.isArray(backup.history)
+    ) {
+      throw new Error('Ce fichier n’est pas une sauvegarde Moony valide.')
+    }
+    setPrograms(backup.programs)
+    setRecords(backup.records)
+    setHistory(backup.history)
   }, [])
 
   const saveRecord = useCallback((record: Omit<PersonalRecord, 'id'> & { id?: string }) => {
@@ -247,6 +339,11 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       loaded,
       programs,
       records,
+      history,
+      logTimer,
+      deleteHistoryEntry,
+      exportData,
+      importData,
       addProgram,
       renameProgram,
       deleteProgram,
@@ -269,6 +366,11 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       loaded,
       programs,
       records,
+      history,
+      logTimer,
+      deleteHistoryEntry,
+      exportData,
+      importData,
       addProgram,
       renameProgram,
       deleteProgram,
