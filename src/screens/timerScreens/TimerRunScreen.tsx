@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 
 //React Navigation
@@ -7,11 +7,23 @@ import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../../App'
 
 import Button from '../../components/Button'
+import Mascot from '../../components/mascot/Mascot'
+import { PoseName } from '../../components/mascot/figure'
 import ProgressBar from '../../components/ProgressBar'
-import { colors } from '../../constants/colors'
 import { useStore } from '../../store/StoreContext'
+import { mix, onColor } from '../../theme/palettes'
+import { makeStyles, useTheme } from '../../theme/ThemeContext'
 import { confirmAction } from '../../utils/helpers'
-import { buildPhases, describeTimer, formatClock, getSnapshot, totalDurationSec } from '../../utils/timer'
+import {
+  buildPhases,
+  describeTimer,
+  formatClock,
+  getSnapshot,
+  phaseStartMs,
+  segmentsOf,
+  timerLabels,
+  totalDurationSec,
+} from '../../utils/timer'
 import { useBeeps } from '../../utils/useBeeps'
 
 type TimerRunProps = StackScreenProps<RootStackParamList, 'TimerRun'>
@@ -21,14 +33,12 @@ type Status = 'ready' | 'running' | 'paused' | 'finished'
 const PREP_MS = 10 * 1000
 const TICK_MS = 100
 
-const phaseColors = {
-  prep: colors.yellow,
-  work: colors.green,
-  rest: colors.red,
-}
+const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`
 
 const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
   const { config, exerciseRef } = route.params
+  const theme = useTheme()
+  const styles = useStyles()
   const { programs, completeExercise } = useStore()
   const beep = useBeeps()
 
@@ -40,41 +50,72 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
       ?.exercises.find(e => e.id === exerciseRef.exerciseId)
   }, [programs, exerciseRef])
 
+  const segments = useMemo(() => segmentsOf(config), [config])
   const phases = useMemo(() => buildPhases(config), [config])
   const totalMs = totalDurationSec(phases) * 1000
 
   const [status, setStatus] = useState<Status>('ready')
   const [elapsedMs, setElapsedMs] = useState(0) // inclut les 10 s de préparation
-  const [rounds, setRounds] = useState(0) // compteur de tours (AMRAP / For Time)
+  const [rounds, setRounds] = useState<Record<number, number>>({}) // tours comptés par bloc (AMRAP / For Time)
   const [result, setResult] = useState('')
   const accumulatedMs = useRef(0)
   const startedAt = useRef<number | null>(null)
   const lastBeepKey = useRef('')
+  const roundsRef = useRef(rounds)
+  roundsRef.current = rounds
+  const forTimeSec = useRef<Record<number, number>>({}) // temps réalisé par bloc For Time
 
   const inPrep = elapsedMs < PREP_MS
   const snapshot = getSnapshot(phases, Math.max(0, elapsedMs - PREP_MS))
-  const workoutElapsedMs = snapshot.totalElapsedMs
+  const { phase } = snapshot
+  const segmentIndex = phase.segmentIndex
+  const isMix = config.type === 'MIX'
 
   const readElapsed = () =>
     accumulatedMs.current + (startedAt.current !== null ? Date.now() - startedAt.current : 0)
 
+  // Résultat pré-rempli : tours pour un AMRAP, temps pour un For Time (bloc par bloc pour un MIX)
+  const buildResult = useCallback(
+    (reachedSegment: number) =>
+      segments
+        .map((segment, i) => {
+          if (i > reachedSegment) return null
+          const r = roundsRef.current[i] ?? 0
+          let text: string | null = null
+          if (segment.type === 'AMRAP') text = plural(r, 'tour')
+          if (segment.type === 'FOR_TIME') {
+            const time = forTimeSec.current[i]
+            text = time !== undefined ? formatClock(time) : `Time cap${r ? ` (${plural(r, 'tour')})` : ''}`
+          }
+          return text && (segments.length > 1 ? `Bloc ${i + 1} : ${text}` : text)
+        })
+        .filter(Boolean)
+        .join(' · '),
+    [segments],
+  )
+
   const finish = useCallback(
-    (timeCapReached: boolean) => {
-      const elapsed = Math.max(0, readElapsed() - PREP_MS)
+    (reachedSegment: number) => {
       accumulatedMs.current = readElapsed()
       startedAt.current = null
       setElapsedMs(accumulatedMs.current)
       setStatus('finished')
       beep('long')
-      // Pré-remplit le résultat selon le type de timer
-      if (config.type === 'AMRAP') {
-        setResult(`${rounds} tour${rounds > 1 ? 's' : ''}`)
-      } else if (config.type === 'FOR_TIME') {
-        setResult(timeCapReached ? `Time cap (${rounds} tour${rounds > 1 ? 's' : ''})` : formatClock(Math.floor(elapsed / 1000)))
-      }
+      setResult(buildResult(reachedSegment))
     },
-    [beep, config.type, rounds],
+    [beep, buildResult],
   )
+
+  // Saute directement au début d'une phase (fin d'un For Time, repos écourté)
+  const skipTo = (phaseIndex: number) => {
+    if (phaseIndex >= phases.length) {
+      finish(segments.length - 1)
+      return
+    }
+    accumulatedMs.current = PREP_MS + phaseStartMs(phases, phaseIndex)
+    if (startedAt.current !== null) startedAt.current = Date.now()
+    setElapsedMs(accumulatedMs.current)
+  }
 
   // Boucle principale : le temps est recalculé à partir de Date.now() pour éviter toute dérive
   useEffect(() => {
@@ -87,7 +128,7 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
   useEffect(() => {
     if (status !== 'running') return
     if (!inPrep && snapshot.finished) {
-      finish(true)
+      finish(segments.length - 1)
       return
     }
     const remainingMs = inPrep ? PREP_MS - elapsedMs : snapshot.phaseRemainingMs
@@ -102,7 +143,7 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
     } else if (remainingSec <= 3) {
       beep('short')
     }
-  }, [status, elapsedMs, inPrep, snapshot, finish, beep])
+  }, [status, elapsedMs, inPrep, snapshot, finish, beep, segments.length])
 
   // Garde l'écran allumé pendant le timer
   useEffect(() => {
@@ -132,9 +173,10 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
   const start = () => {
     accumulatedMs.current = 0
     lastBeepKey.current = ''
+    forTimeSec.current = {}
     startedAt.current = Date.now()
     setElapsedMs(0)
-    setRounds(0)
+    setRounds({})
     setResult('')
     setStatus('running')
   }
@@ -151,6 +193,14 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
     setStatus('running')
   }
 
+  const addRound = () => setRounds(prev => ({ ...prev, [segmentIndex]: (prev[segmentIndex] ?? 0) + 1 }))
+
+  const completeForTime = () => {
+    forTimeSec.current[segmentIndex] = Math.floor(snapshot.phaseElapsedMs / 1000)
+    if (snapshot.phaseIndex === phases.length - 1) finish(segmentIndex)
+    else skipTo(snapshot.phaseIndex + 1)
+  }
+
   const validate = () => {
     if (!exerciseRef) return
     completeExercise(exerciseRef, result)
@@ -159,80 +209,144 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
 
   // ---- Affichage ----
 
+  const started = status !== 'ready'
+  const working = started && status !== 'finished' && !inPrep
+  let background = theme.colors.background
+  if (started && status !== 'finished') {
+    background = inPrep || phase.kind === 'rest' ? theme.colors.surfaceAlt : theme.timer[phase.segmentType]
+  }
+  const foreground = background === theme.colors.background ? theme.colors.text : onColor(background)
+  const soft = mix(background, foreground, 0.14)
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerStyle: { backgroundColor: background, elevation: 0, shadowOpacity: 0, borderBottomWidth: 0 },
+      headerTintColor: foreground,
+    })
+  }, [navigation, background, foreground])
+
   let phaseLabel: string
   let clockSec: number
-  let color: string
   if (status === 'ready') {
-    phaseLabel = 'PRÊT ?'
-    clockSec = snapshot.phase.countUp ? 0 : phases[0].durationSec
-    color = colors.text
-  } else if (inPrep && status !== 'finished') {
-    phaseLabel = 'PRÉPARATION'
-    clockSec = Math.ceil((PREP_MS - elapsedMs) / 1000)
-    color = phaseColors.prep
+    phaseLabel = 'Prêt ?'
+    clockSec = phases[0].countUp ? 0 : phases[0].durationSec
   } else if (status === 'finished') {
-    phaseLabel = 'TERMINÉ'
-    clockSec = Math.floor(workoutElapsedMs / 1000)
-    color = colors.text
+    phaseLabel = 'Terminé'
+    clockSec = Math.floor(snapshot.totalElapsedMs / 1000)
+  } else if (inPrep) {
+    phaseLabel = 'Préparation'
+    clockSec = Math.ceil((PREP_MS - elapsedMs) / 1000)
   } else {
-    phaseLabel = snapshot.phase.kind === 'work' ? 'TRAVAIL' : 'REPOS'
-    clockSec = snapshot.phase.countUp
-      ? Math.floor(snapshot.phaseElapsedMs / 1000)
-      : Math.ceil(snapshot.phaseRemainingMs / 1000)
-    color = phaseColors[snapshot.phase.kind]
+    phaseLabel = phase.kind === 'work' ? 'Travail' : 'Repos'
+    clockSec = phase.countUp ? Math.floor(snapshot.phaseElapsedMs / 1000) : Math.ceil(snapshot.phaseRemainingMs / 1000)
   }
 
-  const showRoundCounter = config.type === 'AMRAP' || config.type === 'FOR_TIME'
-  const showPhaseRounds = config.type === 'EMOM' || config.type === 'TABATA'
-  const progress = totalMs > 0 ? Math.min(1, workoutElapsedMs / totalMs) : 0
+  // La mascotte s'anime : swing pendant le travail, respiration pendant la préparation et le repos
+  let pose: PoseName = 'jack'
+  if (status === 'finished') pose = 'flex'
+  else if (started && (inPrep || phase.kind === 'rest')) pose = Math.floor(elapsedMs / 900) % 2 ? 'restBreath' : 'rest'
+  else if (started) pose = Math.floor(elapsedMs / 700) % 2 ? 'swingDown' : 'swingUp'
+
+  const segment = segments[segmentIndex]
+  const nextSegment = segments[segmentIndex + 1]
+  const showRoundCounter = working && (segment.type === 'AMRAP' || segment.type === 'FOR_TIME')
+  const progress = totalMs > 0 ? Math.min(1, snapshot.totalElapsedMs / totalMs) : 0
   const isActive = status === 'running' || status === 'paused'
+  const segmentRounds = rounds[segmentIndex] ?? 0
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView
+      style={[styles.screen, { backgroundColor: background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Text style={styles.title}>{exercise?.name ?? describeTimer(config)}</Text>
-          {exercise && <Text style={styles.subtitle}>{describeTimer(config)}</Text>}
-          {!!exercise?.details && <Text style={styles.details}>{exercise.details}</Text>}
+          <Text style={[styles.title, { color: foreground }]}>{exercise?.name ?? timerLabels[config.type]}</Text>
+          <Text style={[styles.subtitle, { color: foreground }]}>{describeTimer(config)}</Text>
+          {isMix && working && (
+            <View style={[styles.segmentPill, { backgroundColor: soft }]}>
+              <Text style={[styles.segmentText, { color: foreground }]}>
+                Bloc {segmentIndex + 1}/{segments.length} · {describeTimer(segment)}
+              </Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.clockContainer}>
-          <Text style={[styles.phase, { color }]}>{phaseLabel}</Text>
-          <Text style={[styles.clock, { color }]} accessibilityRole="timer">
+        <View style={styles.center}>
+          <Mascot
+            pose={pose}
+            size={150}
+            onBackground={background === theme.colors.background ? undefined : background}
+          />
+          <Text style={[styles.phase, { color: foreground }]}>{phaseLabel}</Text>
+          <Text style={[styles.clock, { color: foreground }]} accessibilityRole="timer">
             {formatClock(clockSec)}
           </Text>
-          {showPhaseRounds && status !== 'ready' && !inPrep && (
-            <Text style={styles.rounds}>
-              Tour {snapshot.phase.round} / {snapshot.phase.totalRounds}
-            </Text>
+          <View style={styles.infoRow}>
+            {working && phase.totalRounds > 1 && (
+              <Text style={[styles.info, { color: foreground }]}>
+                Tour {phase.round}/{phase.totalRounds}
+              </Text>
+            )}
+            {(showRoundCounter || (status === 'paused' && segmentRounds > 0)) && (
+              <Text style={[styles.info, { color: foreground }]}>{plural(segmentRounds, 'tour')}</Text>
+            )}
+            {working && segment.type === 'FOR_TIME' && (
+              <Text style={[styles.infoMuted, { color: foreground }]}>cap {formatClock(segment.capSec)}</Text>
+            )}
+          </View>
+          {isMix && working && nextSegment && (
+            <Text style={[styles.next, { color: foreground }]}>Ensuite : {describeTimer(nextSegment)}</Text>
           )}
-          {showRoundCounter && status !== 'ready' && <Text style={styles.rounds}>Tours : {rounds}</Text>}
-          {config.type === 'FOR_TIME' && status !== 'ready' && status !== 'finished' && (
-            <Text style={styles.cap}>Time cap {formatClock(config.capSec)}</Text>
+          {started && (
+            <ProgressBar progress={progress} color={foreground} trackColor={soft} style={styles.progress} />
           )}
-          <ProgressBar progress={progress} color={color} style={styles.progress} />
         </View>
 
-        {status === 'ready' && <Button title="DÉMARRER" color={colors.green} onPress={start} />}
+        {!!exercise?.details && status !== 'finished' && (
+          <View style={[styles.details, { backgroundColor: started ? soft : theme.colors.surface }]}>
+            <Text style={[styles.detailsText, { color: foreground }]}>{exercise.details}</Text>
+          </View>
+        )}
+
+        {status === 'ready' && <Button title="Démarrer" size="lg" color={theme.timer[config.type]} onPress={start} />}
 
         {isActive && (
           <View style={styles.controls}>
-            {showRoundCounter && status === 'running' && !inPrep && (
-              <Pressable style={styles.roundButton} onPress={() => setRounds(r => r + 1)}>
-                <Text style={styles.roundButtonText}>+1 TOUR</Text>
+            {showRoundCounter && status === 'running' && (
+              <Pressable
+                style={({ pressed }) => [styles.roundButton, { backgroundColor: soft }, pressed && { opacity: 0.7 }]}
+                onPress={addRound}
+              >
+                <Text style={[styles.roundButtonText, { color: foreground }]}>+1 tour</Text>
               </Pressable>
             )}
-            {config.type === 'FOR_TIME' && status === 'running' && !inPrep && (
-              <Button title="TERMINÉ !" color={colors.green} onPress={() => finish(false)} />
+            {working && segment.type === 'FOR_TIME' && status === 'running' && (
+              <Button title="Terminé !" size="lg" variant="outline" color={foreground} onPress={completeForTime} />
+            )}
+            {working && phase.kind === 'rest' && (
+              <Button
+                title="Passer le repos"
+                variant="outline"
+                color={foreground}
+                onPress={() => skipTo(snapshot.phaseIndex + 1)}
+              />
             )}
             <View style={styles.row}>
               {status === 'running' ? (
-                <Button title="PAUSE" color={colors.yellow} onPress={pause} style={styles.flex} />
+                <Button title="Pause" size="lg" color={foreground} onPress={pause} style={styles.flex} />
               ) : (
-                <Button title="REPRENDRE" color={colors.green} onPress={resume} style={styles.flex} />
+                <Button title="Reprendre" size="lg" color={foreground} onPress={resume} style={styles.flex} />
               )}
               {status === 'paused' && (
-                <Button title="ARRÊTER" color={colors.red} onPress={() => finish(false)} style={styles.flex} />
+                <Button
+                  title="Arrêter"
+                  size="lg"
+                  variant="outline"
+                  color={foreground}
+                  onPress={() => finish(inPrep ? -1 : segmentIndex)}
+                  style={styles.flex}
+                />
               )}
             </View>
           </View>
@@ -242,28 +356,28 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
           <View style={styles.finishPanel}>
             {exerciseRef ? (
               <>
-                <Text style={styles.finishTitle}>Exercice terminé !</Text>
+                <Text style={styles.finishTitle}>Bien joué ! 💪</Text>
                 <Text style={styles.label}>Résultat / score (optionnel)</Text>
                 <TextInput
                   style={styles.input}
                   value={result}
                   onChangeText={setResult}
                   placeholder="ex : 5 tours + 12 reps, 60 kg…"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={theme.colors.textMuted}
                 />
-                <Button title="✓ VALIDER L'EXERCICE" color={colors.green} onPress={validate} />
+                <Button title="✓ Valider l'exercice" size="lg" color={theme.colors.success} onPress={validate} />
                 <Button
                   title="Ne pas valider"
-                  variant="outline"
-                  color={colors.textMuted}
+                  variant="ghost"
+                  color={theme.colors.textMuted}
                   onPress={() => navigation.goBack()}
                 />
               </>
             ) : (
               <>
-                {!!result && <Text style={styles.finishTitle}>Résultat : {result}</Text>}
-                <Button title="RECOMMENCER" color={colors.green} onPress={start} />
-                <Button title="Retour" variant="outline" color={colors.textMuted} onPress={() => navigation.goBack()} />
+                {!!result && <Text style={styles.finishTitle}>{result}</Text>}
+                <Button title="Recommencer" size="lg" onPress={start} />
+                <Button title="Retour" variant="ghost" color={theme.colors.textMuted} onPress={() => navigation.goBack()} />
               </>
             )}
           </View>
@@ -275,70 +389,94 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
 
 export default TimerRunScreen
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts }) => ({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
     flexGrow: 1,
-    padding: 20,
+    paddingHorizontal: 20,
     paddingBottom: 40,
   },
   header: {
     alignItems: 'center',
   },
   title: {
-    color: colors.text,
-    fontSize: 26,
-    fontWeight: 'bold',
+    fontFamily: fonts.display,
+    fontSize: 24,
+    letterSpacing: -0.5,
     textAlign: 'center',
   },
   subtitle: {
-    color: colors.textMuted,
-    fontSize: 16,
-    marginTop: 4,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    opacity: 0.7,
+    marginTop: 2,
   },
-  details: {
-    color: colors.text,
-    fontSize: 16,
-    marginTop: 12,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    padding: 12,
-    alignSelf: 'stretch',
-    lineHeight: 22,
+  segmentPill: {
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginTop: 10,
   },
-  clockContainer: {
+  segmentText: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+  },
+  center: {
     alignItems: 'center',
     justifyContent: 'center',
     flexGrow: 1,
-    paddingVertical: 30,
+    paddingVertical: 16,
   },
   phase: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: 2,
+    fontFamily: fonts.semibold,
+    fontSize: 15,
+    letterSpacing: 3,
+    textTransform: 'uppercase',
+    marginTop: 4,
   },
   clock: {
+    fontFamily: fonts.display,
     fontSize: 96,
-    fontWeight: '700',
+    letterSpacing: -3,
     fontVariant: ['tabular-nums'],
+    lineHeight: 108,
   },
-  rounds: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: '600',
-    marginTop: 4,
+  infoRow: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'baseline',
+    minHeight: 26,
   },
-  cap: {
-    color: colors.textMuted,
-    fontSize: 15,
-    marginTop: 4,
+  info: {
+    fontFamily: fonts.displayMedium,
+    fontSize: 20,
+  },
+  infoMuted: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  next: {
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    opacity: 0.75,
+    marginTop: 6,
   },
   progress: {
     alignSelf: 'stretch',
-    marginTop: 24,
+    marginTop: 20,
+  },
+  details: {
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+  },
+  detailsText: {
+    fontFamily: fonts.body,
+    fontSize: 15,
+    lineHeight: 22,
   },
   controls: {
     gap: 12,
@@ -351,36 +489,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   roundButton: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 20,
-    paddingVertical: 28,
+    borderRadius: 24,
+    paddingVertical: 26,
     alignItems: 'center',
   },
   roundButtonText: {
-    color: colors.text,
+    fontFamily: fonts.display,
     fontSize: 26,
-    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   finishPanel: {
     gap: 12,
   },
   finishTitle: {
-    color: colors.text,
+    fontFamily: fonts.display,
     fontSize: 22,
-    fontWeight: 'bold',
+    letterSpacing: -0.4,
+    color: colors.text,
     textAlign: 'center',
   },
   label: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
+    color: colors.textMuted,
   },
   input: {
+    fontFamily: fonts.body,
     backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     color: colors.text,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 17,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    fontSize: 16,
   },
-})
+}))

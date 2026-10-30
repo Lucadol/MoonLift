@@ -1,25 +1,29 @@
 import { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, Text, TextInput, View } from 'react-native'
 
 //React Navigation
 import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../../App'
 
 import Button from '../../components/Button'
+import Card from '../../components/Card'
+import Chip from '../../components/Chip'
+import ScreenHeader from '../../components/ScreenHeader'
 import TimerConfigForm from '../../components/TimerConfigForm'
-import { common } from '../../components/styles'
-import { colors, timerColors } from '../../constants/colors'
+import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
-import { TimerConfig, TimerType } from '../../types'
+import { makeStyles, useTheme } from '../../theme/ThemeContext'
+import { TimerConfig } from '../../types'
 import { confirmAction } from '../../utils/helpers'
-import { defaultTimerConfig, timerLabels } from '../../utils/timer'
+import { defaultTimerConfig, timerLabels, timerTypes } from '../../utils/timer'
 
 type ExerciseEditProps = StackScreenProps<RootStackParamList, 'ExerciseEdit'>
 
-const timerTypes: TimerType[] = ['AMRAP', 'EMOM', 'TABATA', 'FOR_TIME']
-
 const ExerciseEditScreen = ({ navigation, route }: ExerciseEditProps) => {
   const { programId, sessionId, exerciseId } = route.params
+  const theme = useTheme()
+  const common = useCommonStyles()
+  const styles = useStyles()
   const { programs, addExercise, updateExercise, deleteExercise } = useStore()
 
   const existing = exerciseId
@@ -50,15 +54,15 @@ const ExerciseEditScreen = ({ navigation, route }: ExerciseEditProps) => {
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
-      <Text style={common.title}>{exerciseId ? 'Modifier l’exercice' : 'Nouvel exercice'}</Text>
+      <ScreenHeader eyebrow="Séance" title={exerciseId ? 'Modifier l’exercice' : 'Nouvel exercice'} pose="jack" />
 
-      <Text style={common.label}>Nom</Text>
+      <Text style={[common.label, { marginTop: 0 }]}>Nom</Text>
       <TextInput
         style={common.input}
         value={name}
         onChangeText={setName}
         placeholder="ex : WOD, Back Squat, Échauffement…"
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={theme.colors.textMuted}
       />
 
       <Text style={common.label}>Détails</Text>
@@ -67,44 +71,48 @@ const ExerciseEditScreen = ({ navigation, route }: ExerciseEditProps) => {
         value={details}
         onChangeText={setDetails}
         placeholder={'ex :\n10 Pull-ups\n15 Push-ups\n20 Air squats'}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={theme.colors.textMuted}
         multiline
         textAlignVertical="top"
       />
 
       <Text style={common.label}>Timer</Text>
       <View style={styles.types}>
-        <Pressable
-          onPress={() => setTimer(undefined)}
-          style={[styles.chip, { borderColor: colors.textMuted }, !timer && { backgroundColor: colors.surfaceAlt }]}
-        >
-          <Text style={styles.chipText}>Sans timer</Text>
-        </Pressable>
-        {timerTypes.map(type => {
-          const selected = timer?.type === type
-          return (
-            <Pressable
-              key={type}
-              onPress={() => !selected && setTimer(defaultTimerConfig(type))}
-              style={[styles.chip, { borderColor: timerColors[type] }, selected && { backgroundColor: timerColors[type] }]}
-            >
-              <Text style={styles.chipText}>{timerLabels[type]}</Text>
-            </Pressable>
-          )
-        })}
+        <Chip label="Sans timer" selected={!timer} onPress={() => setTimer(undefined)} />
+        {timerTypes.map(type => (
+          <Chip
+            key={type}
+            label={timerLabels[type]}
+            color={theme.timer[type]}
+            selected={timer?.type === type}
+            onPress={() => timer?.type !== type && setTimer(defaultTimerConfig(type))}
+          />
+        ))}
       </View>
 
       {timer ? (
-        <View style={common.card}>
+        <Card>
           <TimerConfigForm config={timer} onChange={setTimer} />
-        </View>
+        </Card>
       ) : (
-        <Text style={styles.hint}>Sans timer, l’exercice se valide manuellement depuis la séance.</Text>
+        <Text style={common.cardText}>Sans timer, l’exercice se valide manuellement depuis la séance.</Text>
       )}
 
-      <Button title="Enregistrer" color={colors.green} onPress={save} disabled={!name.trim()} style={{ marginTop: 20 }} />
+      <Button
+        title="Enregistrer"
+        size="lg"
+        onPress={save}
+        disabled={!name.trim() || (timer?.type === 'MIX' && timer.segments.length === 0)}
+        style={{ marginTop: 20 }}
+      />
       {exerciseId && (
-        <Button title="Supprimer l’exercice" variant="outline" color={colors.red} onPress={remove} style={{ marginTop: 12 }} />
+        <Button
+          title="Supprimer l’exercice"
+          variant="ghost"
+          color={theme.colors.danger}
+          onPress={remove}
+          style={{ marginTop: 6 }}
+        />
       )}
     </ScrollView>
   )
@@ -112,7 +120,7 @@ const ExerciseEditScreen = ({ navigation, route }: ExerciseEditProps) => {
 
 export default ExerciseEditScreen
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(() => ({
   multiline: {
     minHeight: 120,
   },
@@ -120,20 +128,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  chip: {
-    borderWidth: 2,
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  chipText: {
-    color: colors.text,
-    fontWeight: '600',
-  },
-  hint: {
-    color: colors.textMuted,
-    fontSize: 15,
-  },
-})
+}))

@@ -1,19 +1,24 @@
 import { useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, Text, TextInput, View } from 'react-native'
 
 //React Navigation
 import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../../App'
 
 import Button from '../../components/Button'
-import { common } from '../../components/styles'
-import { colors } from '../../constants/colors'
+import Card from '../../components/Card'
+import ScreenHeader from '../../components/ScreenHeader'
+import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
+import { makeStyles, useTheme } from '../../theme/ThemeContext'
 import { formatRecordValue, groupRecords } from '../../utils/records'
 
 type RecordsProps = StackScreenProps<RootStackParamList, 'Records'>
 
 const RecordsScreen = ({ navigation }: RecordsProps) => {
+  const theme = useTheme()
+  const common = useCommonStyles()
+  const styles = useStyles()
   const { records } = useStore()
   const [search, setSearch] = useState('')
 
@@ -22,29 +27,32 @@ const RecordsScreen = ({ navigation }: RecordsProps) => {
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
-      <Text style={common.title}>Mes PR</Text>
+      <ScreenHeader eyebrow="Records personnels" title="Mes PR" subtitle="Chaque kilo compte" pose="trophy" />
 
       {movements.length > 3 && (
         <TextInput
-          style={[common.input, { marginBottom: 16 }]}
+          style={[common.input, { marginBottom: 14 }]}
           value={search}
           onChangeText={setSearch}
           placeholder="Rechercher un mouvement…"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={theme.colors.textMuted}
         />
       )}
 
       {movements.length === 0 && (
-        <Text style={common.empty}>
-          Aucun record enregistré.{'\n'}Ajoute tes PR (1RM, benchmarks, max reps…) pour suivre ta progression.
-        </Text>
+        <Card>
+          <Text style={common.cardTitle}>Aucun record pour l’instant</Text>
+          <Text style={common.cardText}>
+            Ajoute tes PR (1RM, benchmarks, max reps…) pour suivre ta progression mouvement par mouvement.
+          </Text>
+        </Card>
       )}
 
       {filtered.map(summary => (
-        <Pressable
+        <Card
           key={summary.key}
-          style={[common.card, styles.card]}
           onPress={() => navigation.navigate('RecordDetail', { movementKey: summary.key })}
+          style={styles.card}
         >
           <View style={styles.cardBody}>
             <Text style={common.cardTitle}>{summary.movement}</Text>
@@ -53,14 +61,14 @@ const RecordsScreen = ({ navigation }: RecordsProps) => {
             </Text>
           </View>
           <Text style={styles.best}>{formatRecordValue(summary.best)}</Text>
-        </Pressable>
+        </Card>
       ))}
 
       <Button
         title="+ Ajouter un PR"
-        color={colors.orange}
+        color={theme.colors.tertiary}
         onPress={() => navigation.navigate('RecordEdit', {})}
-        style={{ marginTop: 10 }}
+        style={{ marginTop: 8 }}
       />
     </ScrollView>
   )
@@ -68,7 +76,7 @@ const RecordsScreen = ({ navigation }: RecordsProps) => {
 
 export default RecordsScreen
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts }) => ({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -78,9 +86,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   best: {
-    color: colors.orange,
+    fontFamily: fonts.display,
+    color: colors.text,
     fontSize: 22,
-    fontWeight: 'bold',
+    letterSpacing: -0.5,
     fontVariant: ['tabular-nums'],
   },
-})
+}))

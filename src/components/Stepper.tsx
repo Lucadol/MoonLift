@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { colors } from '../constants/colors'
+import { Pressable, Text, View } from 'react-native'
+import { makeStyles } from '../theme/ThemeContext'
 
 interface StepperProps {
   label: string
@@ -12,6 +12,7 @@ interface StepperProps {
 }
 
 const Stepper = ({ label, value, onChange, min, max, step, format = v => `${v}` }: StepperProps) => {
+  const styles = useStyles()
   const change = (delta: number) => onChange(Math.min(max, Math.max(min, value + delta)))
 
   return (
@@ -23,6 +24,7 @@ const Stepper = ({ label, value, onChange, min, max, step, format = v => `${v}` 
           onPress={() => change(-step)}
           disabled={value <= min}
           style={[styles.button, value <= min && styles.disabled]}
+          hitSlop={4}
         >
           <Text style={styles.buttonText}>−</Text>
         </Pressable>
@@ -32,6 +34,7 @@ const Stepper = ({ label, value, onChange, min, max, step, format = v => `${v}` 
           onPress={() => change(step)}
           disabled={value >= max}
           style={[styles.button, value >= max && styles.disabled]}
+          hitSlop={4}
         >
           <Text style={styles.buttonText}>+</Text>
         </Pressable>
@@ -42,16 +45,17 @@ const Stepper = ({ label, value, onChange, min, max, step, format = v => `${v}` 
 
 export default Stepper
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts }) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   label: {
+    fontFamily: fonts.medium,
     color: colors.text,
-    fontSize: 18,
+    fontSize: 16,
     flexShrink: 1,
   },
   controls: {
@@ -59,9 +63,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   button: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: colors.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
@@ -70,16 +74,17 @@ const styles = StyleSheet.create({
     opacity: 0.3,
   },
   buttonText: {
-    color: colors.text,
-    fontSize: 22,
-    fontWeight: '600',
-  },
-  value: {
+    fontFamily: fonts.medium,
     color: colors.text,
     fontSize: 20,
-    fontWeight: '600',
-    minWidth: 80,
+    lineHeight: 22,
+  },
+  value: {
+    fontFamily: fonts.display,
+    color: colors.text,
+    fontSize: 20,
+    minWidth: 78,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
-})
+}))

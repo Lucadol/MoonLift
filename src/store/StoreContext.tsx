@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { Exercise, ExerciseRef, PersonalRecord, Program, Session } from '../types'
 import { uid } from '../utils/helpers'
+import { ParsedSession } from '../utils/importProgram'
 
 const PROGRAMS_KEY = 'moonlift:programs'
 const RECORDS_KEY = 'moonlift:records'
@@ -17,6 +18,7 @@ interface Store {
   addProgram: (name: string) => string
   renameProgram: (programId: string, name: string) => void
   deleteProgram: (programId: string) => void
+  importSessions: (target: { programId: string } | { programName: string }, sessions: ParsedSession[]) => string
   // Séances
   addSession: (programId: string, name: string) => string
   renameSession: (programId: string, sessionId: string, name: string) => void
@@ -36,6 +38,12 @@ interface Store {
 }
 
 const StoreContext = createContext<Store | null>(null)
+
+const toSession = (parsed: ParsedSession): Session => ({
+  id: uid(),
+  name: parsed.name,
+  exercises: parsed.exercises.map(e => ({ ...e, id: uid(), completed: false })),
+})
 
 const mapSession = (
   programs: Program[],
@@ -98,6 +106,23 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   const deleteProgram = useCallback((programId: string) => {
     setPrograms(prev => prev.filter(p => p.id !== programId))
   }, [])
+
+  // Importe des séances dans un programme existant, ou crée un nouveau programme
+  const importSessions = useCallback(
+    (target: { programId: string } | { programName: string }, parsed: ParsedSession[]) => {
+      const sessions = parsed.map(toSession)
+      if ('programId' in target) {
+        setPrograms(prev =>
+          prev.map(p => (p.id === target.programId ? { ...p, sessions: [...p.sessions, ...sessions] } : p)),
+        )
+        return target.programId
+      }
+      const id = uid()
+      setPrograms(prev => [...prev, { id, name: target.programName, sessions }])
+      return id
+    },
+    [],
+  )
 
   const addSession = useCallback((programId: string, name: string) => {
     const id = uid()
@@ -225,6 +250,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       addProgram,
       renameProgram,
       deleteProgram,
+      importSessions,
       addSession,
       renameSession,
       duplicateSession,
@@ -246,6 +272,7 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
       addProgram,
       renameProgram,
       deleteProgram,
+      importSessions,
       addSession,
       renameSession,
       duplicateSession,

@@ -1,9 +1,11 @@
-import { TimerConfig, TimerType } from '../types'
+import { MixSegment, SegmentType, TimerConfig, TimerType } from '../types'
 
 export type PhaseKind = 'work' | 'rest'
 
 export interface Phase {
   kind: PhaseKind
+  segmentIndex: number // bloc du timer MIX (0 pour un timer simple)
+  segmentType: SegmentType
   durationSec: number
   round: number
   totalRounds: number
@@ -19,11 +21,16 @@ export interface TimerSnapshot {
   finished: boolean
 }
 
-export const timerLabels: Record<TimerType, string> = {
+export const timerTypes: TimerType[] = ['AMRAP', 'EMOM', 'TABATA', 'FOR_TIME', 'MIX']
+export const segmentTypes: SegmentType[] = ['AMRAP', 'EMOM', 'TABATA', 'FOR_TIME', 'REST']
+
+export const timerLabels: Record<TimerType | SegmentType, string> = {
   AMRAP: 'AMRAP',
   EMOM: 'EMOM',
   TABATA: 'TABATA',
   FOR_TIME: 'FOR TIME',
+  MIX: 'MIX',
+  REST: 'REPOS',
 }
 
 export const timerDescriptions: Record<TimerType, string> = {
@@ -31,10 +38,28 @@ export const timerDescriptions: Record<TimerType, string> = {
   EMOM: 'Un travail à chaque début de minute',
   TABATA: 'Intervalles travail / repos',
   FOR_TIME: 'Le plus vite possible, avec un time cap',
+  MIX: 'Enchaîne plusieurs timers et des repos',
+}
+
+export const defaultSegment = (type: SegmentType): MixSegment => {
+  switch (type) {
+    case 'REST':
+      return { type, durationSec: 2 * 60 }
+    case 'AMRAP':
+      return { type, durationSec: 6 * 60 }
+    case 'FOR_TIME':
+      return { type, capSec: 8 * 60 }
+    case 'EMOM':
+      return { type, intervalSec: 60, rounds: 6 }
+    case 'TABATA':
+      return { type, workSec: 20, restSec: 10, rounds: 8 }
+  }
 }
 
 export const defaultTimerConfig = (type: TimerType): TimerConfig => {
   switch (type) {
+    case 'MIX':
+      return { type, segments: [defaultSegment('AMRAP'), defaultSegment('REST'), defaultSegment('EMOM')] }
     case 'AMRAP':
       return { type, durationSec: 10 * 60 }
     case 'FOR_TIME':
@@ -46,35 +71,48 @@ export const defaultTimerConfig = (type: TimerType): TimerConfig => {
   }
 }
 
-// Découpe un timer en une suite de phases (travail / repos) jouées l'une après l'autre
-export const buildPhases = (config: TimerConfig): Phase[] => {
-  switch (config.type) {
+const buildSegmentPhases = (segment: MixSegment, segmentIndex: number): Phase[] => {
+  const base = { segmentIndex, segmentType: segment.type, countUp: false }
+  switch (segment.type) {
+    case 'REST':
+      return [{ ...base, kind: 'rest', durationSec: segment.durationSec, round: 1, totalRounds: 1 }]
     case 'AMRAP':
-      return [{ kind: 'work', durationSec: config.durationSec, round: 1, totalRounds: 1, countUp: false }]
+      return [{ ...base, kind: 'work', durationSec: segment.durationSec, round: 1, totalRounds: 1 }]
     case 'FOR_TIME':
-      return [{ kind: 'work', durationSec: config.capSec, round: 1, totalRounds: 1, countUp: true }]
+      return [{ ...base, kind: 'work', durationSec: segment.capSec, round: 1, totalRounds: 1, countUp: true }]
     case 'EMOM':
-      return Array.from({ length: config.rounds }, (_, i) => ({
+      return Array.from({ length: segment.rounds }, (_, i) => ({
+        ...base,
         kind: 'work' as const,
-        durationSec: config.intervalSec,
+        durationSec: segment.intervalSec,
         round: i + 1,
-        totalRounds: config.rounds,
-        countUp: false,
+        totalRounds: segment.rounds,
       }))
     case 'TABATA': {
       const phases: Phase[] = []
-      for (let i = 0; i < config.rounds; i++) {
+      for (let i = 0; i < segment.rounds; i++) {
         const round = i + 1
-        phases.push({ kind: 'work', durationSec: config.workSec, round, totalRounds: config.rounds, countUp: false })
+        phases.push({ ...base, kind: 'work', durationSec: segment.workSec, round, totalRounds: segment.rounds })
         // Pas de repos après le dernier tour
-        if (round < config.rounds && config.restSec > 0) {
-          phases.push({ kind: 'rest', durationSec: config.restSec, round, totalRounds: config.rounds, countUp: false })
+        if (round < segment.rounds && segment.restSec > 0) {
+          phases.push({ ...base, kind: 'rest', durationSec: segment.restSec, round, totalRounds: segment.rounds })
         }
       }
       return phases
     }
   }
 }
+
+export const segmentsOf = (config: TimerConfig): MixSegment[] =>
+  config.type === 'MIX' ? config.segments : [config]
+
+// Découpe un timer en une suite de phases (travail / repos) jouées l'une après l'autre
+export const buildPhases = (config: TimerConfig): Phase[] =>
+  segmentsOf(config).flatMap((segment, index) => buildSegmentPhases(segment, index))
+
+// Instant (en ms depuis le début) où commence une phase
+export const phaseStartMs = (phases: Phase[], index: number) =>
+  phases.slice(0, index).reduce((sum, phase) => sum + phase.durationSec * 1000, 0)
 
 export const totalDurationSec = (phases: Phase[]) =>
   phases.reduce((sum, phase) => sum + phase.durationSec, 0)
@@ -125,7 +163,7 @@ export const parseClock = (text: string): number | null => {
   return parts.reduce((acc, part) => acc * 60 + parseInt(part, 10), 0)
 }
 
-export const describeTimer = (config: TimerConfig) => {
+export const describeTimer = (config: TimerConfig | MixSegment): string => {
   switch (config.type) {
     case 'AMRAP':
       return `AMRAP ${formatClock(config.durationSec)}`
@@ -135,5 +173,11 @@ export const describeTimer = (config: TimerConfig) => {
       return `EMOM ${config.rounds} × ${formatClock(config.intervalSec)}`
     case 'TABATA':
       return `Tabata ${config.rounds} × ${config.workSec}s / ${config.restSec}s`
+    case 'REST':
+      return `Repos ${formatClock(config.durationSec)}`
+    case 'MIX':
+      return `Mix · ${config.segments.length} bloc${config.segments.length > 1 ? 's' : ''} · ${formatClock(
+        totalDurationSec(buildPhases(config)),
+      )}`
   }
 }

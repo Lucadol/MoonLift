@@ -1,67 +1,78 @@
 import { useMemo } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ScrollView, Text, View } from 'react-native'
 
 //React Navigation
 import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../../App'
 
 import Button from '../../components/Button'
-import { common } from '../../components/styles'
-import { colors } from '../../constants/colors'
+import Card from '../../components/Card'
+import Mascot from '../../components/mascot/Mascot'
+import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
+import { onColor } from '../../theme/palettes'
+import { makeStyles, useTheme } from '../../theme/ThemeContext'
 import { formatRecordValue, groupRecords } from '../../utils/records'
 
 type RecordDetailProps = StackScreenProps<RootStackParamList, 'RecordDetail'>
 
 const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
   const { movementKey } = route.params
+  const theme = useTheme()
+  const common = useCommonStyles()
+  const styles = useStyles()
   const { records } = useStore()
 
   const summary = useMemo(() => groupRecords(records).find(m => m.key === movementKey), [records, movementKey])
   if (!summary) {
     return (
-      <View style={common.screen}>
-        <Text style={common.empty}>Aucun record pour ce mouvement.</Text>
+      <View style={[common.screen, common.content]}>
+        <Text style={common.subtitle}>Aucun record pour ce mouvement.</Text>
       </View>
     )
   }
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.content}>
-      <Text style={common.title}>{summary.movement}</Text>
+      <Text style={common.eyebrow}>Mouvement</Text>
+      <Text style={[common.title, { marginBottom: 18 }]}>{summary.movement}</Text>
 
-      <View style={[common.card, styles.bestCard]}>
-        <Text style={styles.bestLabel}>MEILLEUR RECORD</Text>
-        <Text style={styles.bestValue}>{formatRecordValue(summary.best)}</Text>
-        <Text style={common.cardText}>{summary.best.date}</Text>
+      <View style={styles.bestCard}>
+        <View style={styles.bestText}>
+          <Text style={styles.bestLabel}>Meilleur record</Text>
+          <Text style={styles.bestValue}>{formatRecordValue(summary.best)}</Text>
+          <Text style={styles.bestDate}>{summary.best.date}</Text>
+        </View>
+        <Mascot pose="flex" size={110} onBackground={theme.colors.tertiary} />
       </View>
 
-      <Text style={common.label}>Historique</Text>
+      <Text style={common.sectionTitle}>Historique</Text>
       {summary.history.map(record => {
         const isBest = record.id === summary.best.id
         return (
-          <Pressable
+          <Card
             key={record.id}
-            style={[common.card, styles.row]}
             onPress={() => navigation.navigate('RecordEdit', { recordId: record.id })}
+            style={styles.row}
           >
             <View style={styles.rowBody}>
               <Text style={common.cardTitle}>
-                {formatRecordValue(record)} {isBest && <Text style={styles.star}>★</Text>}
+                {formatRecordValue(record)}
+                {isBest ? '  ★' : ''}
               </Text>
               <Text style={common.cardText}>{record.date}</Text>
-              {!!record.notes && <Text style={styles.notes}>{record.notes}</Text>}
+              {!!record.notes && <Text style={[common.body, { marginTop: 6 }]}>{record.notes}</Text>}
             </View>
             <Text style={common.link}>Modifier</Text>
-          </Pressable>
+          </Card>
         )
       })}
 
       <Button
         title="+ Nouvelle entrée"
-        color={colors.orange}
+        color={theme.colors.tertiary}
         onPress={() => navigation.navigate('RecordEdit', { movement: summary.movement })}
-        style={{ marginTop: 10 }}
+        style={{ marginTop: 8 }}
       />
     </ScrollView>
   )
@@ -69,40 +80,50 @@ const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
 
 export default RecordDetailScreen
 
-const styles = StyleSheet.create({
-  bestCard: {
-    alignItems: 'center',
-    paddingVertical: 24,
-    borderWidth: 2,
-    borderColor: colors.orange,
-  },
-  bestLabel: {
-    color: colors.orange,
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  bestValue: {
-    color: colors.text,
-    fontSize: 44,
-    fontWeight: 'bold',
-    marginVertical: 4,
-    fontVariant: ['tabular-nums'],
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  rowBody: {
-    flex: 1,
-  },
-  star: {
-    color: colors.orange,
-  },
-  notes: {
-    color: colors.text,
-    fontSize: 15,
-    marginTop: 6,
-  },
+const useStyles = makeStyles(({ colors, fonts }) => {
+  const fg = onColor(colors.tertiary)
+  return {
+    bestCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.tertiary,
+      borderRadius: 24,
+      paddingVertical: 18,
+      paddingLeft: 22,
+      paddingRight: 10,
+    },
+    bestText: {
+      flex: 1,
+    },
+    bestLabel: {
+      fontFamily: fonts.semibold,
+      fontSize: 12,
+      letterSpacing: 1.4,
+      textTransform: 'uppercase',
+      color: fg,
+      opacity: 0.8,
+    },
+    bestValue: {
+      fontFamily: fonts.display,
+      color: fg,
+      fontSize: 42,
+      letterSpacing: -1.5,
+      marginVertical: 2,
+      fontVariant: ['tabular-nums'],
+    },
+    bestDate: {
+      fontFamily: fonts.medium,
+      fontSize: 14,
+      color: fg,
+      opacity: 0.8,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    rowBody: {
+      flex: 1,
+    },
+  }
 })

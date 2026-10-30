@@ -1,14 +1,16 @@
 import { useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { ScrollView } from 'react-native'
 
 //React Navigation
 import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../../App'
 
 import Button from '../../components/Button'
+import Card from '../../components/Card'
+import ScreenHeader from '../../components/ScreenHeader'
 import TimerConfigForm from '../../components/TimerConfigForm'
-import { common } from '../../components/styles'
-import { timerColors } from '../../constants/colors'
+import { useCommonStyles } from '../../components/styles'
+import { useTheme } from '../../theme/ThemeContext'
 import { TimerConfig } from '../../types'
 import { defaultTimerConfig, timerDescriptions, timerLabels } from '../../utils/timer'
 
@@ -16,20 +18,23 @@ type TimerSetupProps = StackScreenProps<RootStackParamList, 'TimerSetup'>
 
 const TimerSetupScreen = ({ navigation, route }: TimerSetupProps) => {
   const { type } = route.params
+  const theme = useTheme()
+  const common = useCommonStyles()
   const [config, setConfig] = useState<TimerConfig>(() => defaultTimerConfig(type))
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.content}>
-      <Text style={common.title}>{timerLabels[type]}</Text>
-      <Text style={common.subtitle}>{timerDescriptions[type]}</Text>
-      <View style={common.card}>
+      <ScreenHeader eyebrow="Réglages" title={timerLabels[type]} subtitle={timerDescriptions[type]} pose="jack" />
+      <Card>
         <TimerConfigForm config={config} onChange={setConfig} />
-      </View>
+      </Card>
       <Button
-        title="DÉMARRER"
-        color={timerColors[type]}
+        title="Démarrer"
+        size="lg"
+        color={theme.timer[type]}
+        disabled={config.type === 'MIX' && config.segments.length === 0}
         onPress={() => navigation.navigate('TimerRun', { config })}
-        style={{ marginTop: 20 }}
+        style={{ marginTop: 12 }}
       />
     </ScrollView>
   )

@@ -1,12 +1,18 @@
 // ---- Timers ----
 
-export type TimerType = 'AMRAP' | 'EMOM' | 'TABATA' | 'FOR_TIME'
-
-export type TimerConfig =
+export type SimpleTimerConfig =
   | { type: 'AMRAP'; durationSec: number }
   | { type: 'FOR_TIME'; capSec: number }
   | { type: 'EMOM'; intervalSec: number; rounds: number }
   | { type: 'TABATA'; workSec: number; restSec: number; rounds: number }
+
+// Un timer MIX enchaîne plusieurs blocs (timers simples ou repos)
+export type MixSegment = SimpleTimerConfig | { type: 'REST'; durationSec: number }
+
+export type TimerConfig = SimpleTimerConfig | { type: 'MIX'; segments: MixSegment[] }
+
+export type TimerType = TimerConfig['type']
+export type SegmentType = MixSegment['type']
 
 // ---- Programme ----
 

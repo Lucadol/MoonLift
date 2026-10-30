@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ScrollView, Text, TextInput, View } from 'react-native'
 
 //React Navigation
 import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../../App'
 
 import Button from '../../components/Button'
-import { common } from '../../components/styles'
-import { colors } from '../../constants/colors'
+import Chip from '../../components/Chip'
+import ScreenHeader from '../../components/ScreenHeader'
+import { useCommonStyles } from '../../components/styles'
+import { makeStyles, useTheme } from '../../theme/ThemeContext'
 import { useStore } from '../../store/StoreContext'
 import { RecordUnit } from '../../types'
 import { confirmAction } from '../../utils/helpers'
@@ -19,6 +21,10 @@ type RecordEditProps = StackScreenProps<RootStackParamList, 'RecordEdit'>
 const RecordEditScreen = ({ navigation, route }: RecordEditProps) => {
   const { recordId, movement: initialMovement } = route.params
   const { records, saveRecord, deleteRecord } = useStore()
+  const theme = useTheme()
+  const { colors } = theme
+  const common = useCommonStyles()
+  const styles = useStyles()
   const existing = recordId ? records.find(r => r.id === recordId) : undefined
 
   // Reprend l'unité déjà utilisée pour ce mouvement
@@ -64,9 +70,9 @@ const RecordEditScreen = ({ navigation, route }: RecordEditProps) => {
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.content} keyboardShouldPersistTaps="handled">
-      <Text style={common.title}>{existing ? 'Modifier le PR' : 'Nouveau PR'}</Text>
+      <ScreenHeader eyebrow="Mes PR" title={existing ? 'Modifier le PR' : 'Nouveau PR'} pose="overhead" />
 
-      <Text style={common.label}>Mouvement</Text>
+      <Text style={[common.label, { marginTop: 0 }]}>Mouvement</Text>
       <TextInput
         style={common.input}
         value={movement}
@@ -77,9 +83,7 @@ const RecordEditScreen = ({ navigation, route }: RecordEditProps) => {
       {suggestions.length > 0 && (
         <View style={styles.suggestions}>
           {suggestions.map(s => (
-            <Pressable key={s} onPress={() => setMovement(s)} style={styles.suggestion}>
-              <Text style={styles.suggestionText}>{s}</Text>
-            </Pressable>
+            <Chip key={s} label={s} onPress={() => setMovement(s)} />
           ))}
         </View>
       )}
@@ -87,16 +91,16 @@ const RecordEditScreen = ({ navigation, route }: RecordEditProps) => {
       <Text style={common.label}>Unité</Text>
       <View style={styles.units}>
         {recordUnits.map(u => (
-          <Pressable
+          <Chip
             key={u.value}
+            label={u.label}
+            color={colors.tertiary}
+            selected={unit === u.value}
             onPress={() => {
               setUnit(u.value)
               setValue('')
             }}
-            style={[styles.unit, unit === u.value && styles.unitSelected]}
-          >
-            <Text style={styles.unitText}>{u.label}</Text>
-          </Pressable>
+          />
         ))}
       </View>
 
@@ -132,9 +136,16 @@ const RecordEditScreen = ({ navigation, route }: RecordEditProps) => {
         textAlignVertical="top"
       />
 
-      <Button title="Enregistrer" color={colors.orange} onPress={save} disabled={!canSave} style={{ marginTop: 24 }} />
+      <Button
+        title="Enregistrer"
+        size="lg"
+        color={colors.tertiary}
+        onPress={save}
+        disabled={!canSave}
+        style={{ marginTop: 24 }}
+      />
       {existing && (
-        <Button title="Supprimer" variant="outline" color={colors.red} onPress={remove} style={{ marginTop: 12 }} />
+        <Button title="Supprimer" variant="ghost" color={colors.danger} onPress={remove} style={{ marginTop: 6 }} />
       )}
     </ScrollView>
   )
@@ -142,51 +153,28 @@ const RecordEditScreen = ({ navigation, route }: RecordEditProps) => {
 
 export default RecordEditScreen
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, fonts }) => ({
   suggestions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     marginTop: 8,
   },
-  suggestion: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 16,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-  },
-  suggestionText: {
-    color: colors.text,
-  },
   units: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  unit: {
-    borderWidth: 2,
-    borderColor: colors.orange,
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-  },
-  unitSelected: {
-    backgroundColor: colors.orange,
-  },
-  unitText: {
-    color: colors.text,
-    fontWeight: '600',
-  },
   hint: {
+    fontFamily: fonts.body,
     color: colors.textMuted,
-    fontSize: 14,
+    fontSize: 13,
     marginTop: 6,
   },
   invalid: {
-    borderWidth: 1,
-    borderColor: colors.red,
+    borderColor: colors.danger,
   },
   multiline: {
     minHeight: 80,
   },
-})
+}))
