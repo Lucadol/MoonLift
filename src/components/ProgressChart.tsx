@@ -47,7 +47,9 @@ const ProgressChart = ({ records }: ProgressChartProps) => {
   if (points.length < 2 || !unit) return null
 
   const values = points.map(p => p.value)
-  const ticks = niceTicks(Math.min(...values), Math.max(...values))
+  // Un score d'AMRAP est stocké en tours × 1000 + reps : graduations en tours entiers
+  const scale = unit === 'rounds' ? 1000 : 1
+  const ticks = niceTicks(Math.min(...values) / scale, Math.max(...values) / scale).map(t => t * scale)
   const [yMin, yMax] = [ticks[0], ticks[ticks.length - 1]]
   const times = points.map(p => new Date(p.date).getTime())
   const [tMin, tMax] = [Math.min(...times), Math.max(...times)]
@@ -58,7 +60,7 @@ const ProgressChart = ({ records }: ProgressChartProps) => {
   const xy = points.map((p, i) => [x(times[i]), y(p.value)] as const)
   const line = xy.map(([px, py], i) => `${i ? 'L' : 'M'} ${px} ${py}`).join(' ')
   const area = `${line} L ${xy[xy.length - 1][0]} ${PAD.top + plotH} L ${xy[0][0]} ${PAD.top + plotH} Z`
-  const tickLabel = (v: number) => (unit === 'time' ? formatRecordValue({ value: v, unit }) : `${v}`)
+  const tickLabel = (v: number) => (unit === 'time' ? formatRecordValue({ value: v, unit }) : `${v / scale}`)
   const last = points.length - 1
   const focus = selected ?? last
 

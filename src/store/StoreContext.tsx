@@ -1,16 +1,20 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-import { Exercise, ExerciseRef, HistoryEntry, PersonalRecord, Program, Session, TimerConfig } from '../types'
+import { Exercise, ExerciseLog, ExerciseRef, HistoryEntry, PersonalRecord, Program, Session, TimerConfig } from '../types'
 import { uid } from '../utils/helpers'
 import { ParsedSession } from '../utils/importProgram'
+import { summarizeSets } from '../utils/records'
 import { describeTimer } from '../utils/timer'
 
 const PROGRAMS_KEY = 'moonlift:programs'
 const RECORDS_KEY = 'moonlift:records'
 const HISTORY_KEY = 'moonlift:history'
 
-export type ExerciseInput = Omit<Exercise, 'id' | 'completed' | 'result' | 'completedAt' | 'historyId'>
+export type ExerciseInput = Omit<
+  Exercise,
+  'id' | 'completed' | 'result' | 'completedAt' | 'historyId' | 'outcome' | 'comment' | 'sets'
+>
 
 // Format du fichier de sauvegarde
 export interface BackupData {
@@ -43,7 +47,8 @@ interface Store {
   updateExercise: (ref: ExerciseRef, input: ExerciseInput) => void
   deleteExercise: (ref: ExerciseRef) => void
   moveExercise: (ref: ExerciseRef, direction: -1 | 1) => void
-  completeExercise: (ref: ExerciseRef, result?: string) => void
+  // Valide (ou corrige une validation) : résultat, réussite / échec, séries, commentaire
+  completeExercise: (ref: ExerciseRef, log: ExerciseLog) => void
   uncompleteExercise: (ref: ExerciseRef) => void
   // Records
   saveRecord: (record: Omit<PersonalRecord, 'id'> & { id?: string }) => void
@@ -178,6 +183,9 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
             result: undefined,
             completedAt: undefined,
             historyId: undefined,
+            outcome: undefined,
+            comment: undefined,
+            sets: undefined,
           })),
         }
         const sessions = [...p.sessions]
@@ -203,6 +211,9 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
           result: undefined,
           completedAt: undefined,
           historyId: undefined,
+          outcome: undefined,
+          comment: undefined,
+          sets: undefined,
         })),
       })),
     )
@@ -245,24 +256,33 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
   }, [])
 
   const completeExercise = useCallback(
-    (ref: ExerciseRef, result?: string) => {
+    (ref: ExerciseRef, log: ExerciseLog) => {
       const program = programs.find(p => p.id === ref.programId)
       const session = program?.sessions.find(s => s.id === ref.sessionId)
       const exercise = session?.exercises.find(e => e.id === ref.exerciseId)
       if (!program || !session || !exercise) return
-      const now = new Date().toISOString()
-      const cleanResult = result?.trim() || undefined
+      // Une correction garde la date de la validation d'origine
+      const date = exercise.completed && exercise.completedAt ? exercise.completedAt : new Date().toISOString()
+      const clean = {
+        outcome: log.outcome,
+        result: log.result?.trim() || undefined,
+        comment: log.comment?.trim() || undefined,
+        sets: log.sets?.length ? log.sets.map(set => ({ status: set.status, note: set.note?.trim() || undefined })) : undefined,
+      }
       const entry: HistoryEntry = {
-        id: uid(),
-        date: now,
+        id: exercise.historyId ?? uid(),
+        date,
         kind: 'exercise',
         title: exercise.name,
         subtitle: `${program.name} · ${session.name}`,
-        result: cleanResult,
+        result: clean.result,
+        outcome: clean.outcome,
+        comment: clean.comment,
+        sets: summarizeSets(clean.sets),
       }
-      setHistory(prev => [...prev.filter(h => h.id !== exercise.historyId), entry])
+      setHistory(prev => [...prev.filter(h => h.id !== entry.id), entry])
       setPrograms(prev =>
-        mapExercise(prev, ref, e => ({ ...e, completed: true, result: cleanResult, completedAt: now, historyId: entry.id })),
+        mapExercise(prev, ref, e => ({ ...e, ...clean, completed: true, completedAt: date, historyId: entry.id })),
       )
     },
     [programs],
@@ -283,6 +303,9 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
           result: undefined,
           completedAt: undefined,
           historyId: undefined,
+          outcome: undefined,
+          comment: undefined,
+          sets: undefined,
         })),
       )
     },

@@ -108,7 +108,17 @@ const HistoryScreen = () => {
           <Text style={common.sectionTitle}>{formatDayTitle(selectedDay)}</Text>
           {entries.length === 0 && <Text style={common.subtitle}>Jour de repos. Ça compte aussi 😌</Text>}
           {entries.map(entry => (
-            <Card key={entry.id} accent={entry.kind === 'timer' ? theme.colors.quaternary : theme.colors.success} style={styles.entry}>
+            <Card
+              key={entry.id}
+              accent={
+                entry.kind === 'timer'
+                  ? theme.colors.quaternary
+                  : entry.outcome === 'fail'
+                    ? theme.colors.danger
+                    : theme.colors.success
+              }
+              style={styles.entry}
+            >
               <View style={styles.entryHeader}>
                 <Text style={[common.cardTitle, styles.flex]}>{entry.title}</Text>
                 <Text style={styles.time}>
@@ -116,7 +126,15 @@ const HistoryScreen = () => {
                 </Text>
               </View>
               {entry.subtitle && <Text style={common.cardText}>{entry.subtitle}</Text>}
-              {entry.result && <Text style={styles.result}>{entry.result}</Text>}
+              {(entry.outcome || entry.result) && (
+                <Text style={[styles.result, entry.outcome === 'fail' && { color: theme.colors.danger }]}>
+                  {[entry.outcome === 'fail' ? '✗ Échec' : entry.outcome === 'success' ? '✓ Réussi' : null, entry.result]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </Text>
+              )}
+              {entry.sets && <Text style={common.cardText}>{entry.sets}</Text>}
+              {entry.comment && <Text style={styles.comment}>💬 {entry.comment}</Text>}
               <Pressable
                 onPress={() =>
                   confirmAction('Supprimer de l’historique ?', `« ${entry.title} » sera retiré de l’historique.`, () =>
@@ -245,6 +263,14 @@ const useStyles = makeStyles(({ colors, fonts }) => ({
     fontFamily: fonts.semibold,
     fontSize: 14,
     color: colors.success,
+    marginTop: 6,
+  },
+  comment: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    fontStyle: 'italic',
+    color: colors.text,
     marginTop: 6,
   },
   delete: {

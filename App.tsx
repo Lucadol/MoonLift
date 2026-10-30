@@ -9,7 +9,7 @@ import { createStackNavigator, StackNavigationOptions } from '@react-navigation/
 //Store & thème
 import { StoreProvider } from './src/store/StoreContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { ExerciseRef, TimerConfig, TimerType } from './src/types';
+import { ExerciseRef, RecordKind, RecordUnit, TimerConfig, TimerType } from './src/types';
 
 //Screen
 import Home from './src/Home';
@@ -38,8 +38,18 @@ export type RootStackParamList = {
   ExerciseEdit: { programId: string; sessionId: string; exerciseId?: string }
   Import: { programId?: string }
   Records: undefined
-  RecordDetail: { movementKey: string }
-  RecordEdit: { recordId?: string; movement?: string }
+  RecordDetail: { groupKey: string }
+  // Modification d'un PR, ou création pré-remplie (depuis un exercice validé ou un groupe de PR)
+  RecordEdit: {
+    recordId?: string
+    movement?: string
+    kind?: RecordKind
+    context?: string
+    unit?: RecordUnit
+    value?: number
+    distance?: number
+    notes?: string
+  }
   Settings: undefined
   History: undefined
 }

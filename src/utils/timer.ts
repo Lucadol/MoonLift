@@ -193,3 +193,12 @@ export const parseRestSec = (text: string): number | undefined => {
   if (unit) return value * 60
   return value >= 15 ? value : value * 60 // « repos 90 » = 90 s, « repos 2 » = 2 min
 }
+
+// Nombre de séries d'un exercice : tours d'un EMOM / Tabata, « 5x5 », « 4 séries » (0 si inconnu)
+export const parseSetCount = (text: string, timer?: TimerConfig): number => {
+  if (timer?.type === 'EMOM' || timer?.type === 'TABATA') return timer.rounds
+  const setsByReps = text.match(/(\d+)\s*[x×]\s*\d+/)
+  if (setsByReps) return Math.min(20, parseInt(setsByReps[1], 10))
+  const sets = text.match(/(\d+)\s*(?:séries|series|sets)\b/i)
+  return sets ? Math.min(20, parseInt(sets[1], 10)) : 0
+}

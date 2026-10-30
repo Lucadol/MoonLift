@@ -20,15 +20,18 @@ Application de timer pour l'entraînement fonctionnel (Expo / React Native), ave
   (`AMRAP 12'`, `EMOM 10 min`, `E2MOM 20'`, `EMOM 12 x 1:30`, `Tabata 8 x 20/10`, `For Time (cap 15')`)
 - Exercices avec nom, détails et timer associé (optionnel)
 - **▶ Lancer** le timer depuis la séance : à la fin, l'exercice peut être **validé** avec un résultat pré-rempli
-- Validation manuelle des exercices sans timer, progression, duplication et réinitialisation des séances
+- **Validation détaillée** : réussi / échec, séries réussies ou ratées (avec correction : « 3 reps », « 95 kg »), résultat et commentaire ; une validation se corrige ou s'annule ensuite
+- Pendant un EMOM ou un Tabata, bouton « Tour raté » : le tour est pré-marqué en échec à la validation
+- Duplication et réinitialisation des séances
 - **Charges calculées depuis les PR** : « Back Squat 5x5 @ 75% » affiche la charge correspondante
 - **Minuteur de repos** entre les séries (durée lue dans le texte, ex : « repos 2' »)
 - « Reprendre » la séance en cours depuis l'accueil
 
 ### Mes PR
-- Records par mouvement en kg, lb, reps, temps, mètres ou calories
+- Catégories : charge max (1RM, 3RM, 5RM…), EMOM / séries réussies, max reps, benchmark chronométré, AMRAP (tours + reps), course / cardio (course, rameur, SkiErg, vélo, natation, avec l'allure), distance ou calories
+- « Enregistrer comme PR » depuis un exercice validé : formulaire pré-rempli (mouvement, format de l'EMOM, charge…)
 - Meilleur record mis en avant (le plus court pour un temps), historique avec date et notes
-- Graphique de progression et table des charges de travail (50 à 95 %)
+- Graphique de progression et table des charges de travail (50 à 95 %, à partir d'un 1RM estimé pour un 3RM ou 5RM)
 - **Nouveau PR détecté** quand un résultat validé bat le record du mouvement
 
 ### Historique

@@ -11,6 +11,7 @@ import InputModal from '../../components/InputModal'
 import LoadHints from '../../components/LoadHints'
 import ProgressBar from '../../components/ProgressBar'
 import RestTimerModal from '../../components/RestTimerModal'
+import ValidationSheet from '../../components/ValidationSheet'
 import ScreenHeader from '../../components/ScreenHeader'
 import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
@@ -18,6 +19,7 @@ import { onColor } from '../../theme/palettes'
 import { makeStyles, useTheme } from '../../theme/ThemeContext'
 import { Exercise, ExerciseRef } from '../../types'
 import { confirmAction } from '../../utils/helpers'
+import { summarizeSets } from '../../utils/records'
 import { describeTimer, parseRestSec } from '../../utils/timer'
 import { useExerciseValidation } from '../../utils/useExerciseValidation'
 
@@ -50,10 +52,6 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
   const done = session.exercises.filter(e => e.completed).length
   const total = session.exercises.length
 
-  const toggle = (exercise: Exercise) => {
-    if (exercise.completed) uncompleteExercise(refOf(exercise))
-    else setToValidate(exercise)
-  }
 
   const remove = () =>
     confirmAction('Supprimer la séance ?', `« ${session.name} » et ses exercices seront supprimés.`, () => {
@@ -114,14 +112,14 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
           <Card key={exercise.id} style={exercise.completed && styles.cardDone}>
             <View style={styles.cardHeader}>
               <Pressable
-                onPress={() => toggle(exercise)}
+                onPress={() => setToValidate(exercise)}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: exercise.completed }}
                 accessibilityLabel={`Valider ${exercise.name}`}
-                style={[styles.check, exercise.completed && styles.checkDone]}
+                style={[styles.check, exercise.completed && (exercise.outcome === 'fail' ? styles.checkFail : styles.checkDone)]}
                 hitSlop={8}
               >
-                {exercise.completed && <Text style={styles.checkMark}>✓</Text>}
+                {exercise.completed && <Text style={styles.checkMark}>{exercise.outcome === 'fail' ? '✗' : '✓'}</Text>}
               </Pressable>
               <View style={styles.cardBody}>
                 <Text style={[common.cardTitle, exercise.completed && styles.titleDone]}>{exercise.name}</Text>
@@ -133,9 +131,39 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
                 )}
                 {!!exercise.details && <Text style={styles.details}>{exercise.details}</Text>}
                 {!exercise.completed && <LoadHints name={exercise.name} details={exercise.details} />}
-                {!!exercise.result && (
-                  <View style={styles.result}>
-                    <Text style={styles.resultText}>{exercise.result}</Text>
+                {exercise.completed && (
+                  <View style={styles.log}>
+                    <View style={styles.logRow}>
+                      <View style={[styles.badge, exercise.outcome === 'fail' ? styles.badgeFail : styles.badgeSuccess]}>
+                        <Text style={[styles.badgeText, { color: exercise.outcome === 'fail' ? theme.colors.danger : theme.colors.success }]}>
+                          {exercise.outcome === 'fail' ? '✗ Échec' : '✓ Réussi'}
+                        </Text>
+                      </View>
+                      {!!exercise.result && (
+                        <View style={styles.result}>
+                          <Text style={styles.resultText}>{exercise.result}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {!!exercise.sets?.length && (
+                      <View style={styles.logRow}>
+                        {exercise.sets.map((set, i) => (
+                          <View
+                            key={i}
+                            style={[styles.setDot, { backgroundColor: set.status === 'success' ? theme.colors.success : theme.colors.danger }]}
+                          />
+                        ))}
+                        <Text style={styles.setSummary}>{summarizeSets(exercise.sets)}</Text>
+                      </View>
+                    )}
+                    {exercise.sets?.map((set, i) =>
+                      set.status === 'fail' && set.note ? (
+                        <Text key={i} style={styles.setNote}>
+                          Série {i + 1} : {set.note}
+                        </Text>
+                      ) : null,
+                    )}
+                    {!!exercise.comment && <Text style={styles.comment}>💬 {exercise.comment}</Text>}
                   </View>
                 )}
               </View>
@@ -159,6 +187,11 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
                   onPress={() => setResting(exercise)}
                 >
                   <Text style={styles.restButtonText}>⏱ Repos</Text>
+                </Pressable>
+              )}
+              {exercise.completed && (
+                <Pressable onPress={() => setToValidate(exercise)} hitSlop={6}>
+                  <Text style={common.link}>Corriger</Text>
                 </Pressable>
               )}
               <View style={styles.spacer} />
@@ -201,15 +234,11 @@ const SessionScreen = ({ navigation, route }: SessionProps) => {
         onSubmit={name => renameSession(programId, sessionId, name)}
         onClose={() => setIsRenameVisible(false)}
       />
-      <InputModal
+      <ValidationSheet
         visible={toValidate !== null}
-        title={`Valider « ${toValidate?.name ?? ''} »`}
-        label="Résultat / score (optionnel)"
-        placeholder="ex : 5x5 @ 100 kg"
-        submitLabel="✓ Valider"
-        submitColor={theme.colors.success}
-        required={false}
-        onSubmit={result => toValidate && validate(refOf(toValidate), toValidate.name, result)}
+        exercise={toValidate}
+        onSubmit={(log, saveAsRecord) => toValidate && validate(refOf(toValidate), toValidate, log, { saveAsRecord })}
+        onUnvalidate={() => toValidate && uncompleteExercise(refOf(toValidate))}
         onClose={() => setToValidate(null)}
       />
       <RestTimerModal
@@ -259,6 +288,59 @@ const useStyles = makeStyles(({ colors, fonts }) => ({
     backgroundColor: colors.success,
     borderColor: colors.success,
   },
+  checkFail: {
+    backgroundColor: colors.danger,
+    borderColor: colors.danger,
+  },
+  log: {
+    marginTop: 10,
+    gap: 6,
+  },
+  logRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  badge: {
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+  },
+  badgeSuccess: {
+    borderColor: colors.success,
+  },
+  badgeFail: {
+    borderColor: colors.danger,
+  },
+  badgeText: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+  },
+  setDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  setSummary: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginLeft: 4,
+  },
+  setNote: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: colors.danger,
+  },
+  comment: {
+    fontFamily: fonts.body,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.text,
+    fontStyle: 'italic',
+  },
   checkMark: {
     fontFamily: fonts.semibold,
     color: colors.surface,
@@ -291,17 +373,15 @@ const useStyles = makeStyles(({ colors, fonts }) => ({
     lineHeight: 20,
   },
   result: {
-    alignSelf: 'flex-start',
     backgroundColor: colors.background,
     borderRadius: 10,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginTop: 10,
+    paddingVertical: 6,
   },
   resultText: {
     fontFamily: fonts.semibold,
     fontSize: 13,
-    color: colors.success,
+    color: colors.text,
   },
   actions: {
     flexDirection: 'row',

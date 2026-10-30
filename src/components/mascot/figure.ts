@@ -17,6 +17,8 @@ export type ColorRole =
   | 'sweat' // goutte de sueur
   | 'shadow'
   | 'backdrop'
+  | 'moonPale' // disque de pleine lune
+  | 'crater' // cratères
 
 interface Stroke {
   stroke?: ColorRole
@@ -34,11 +36,21 @@ export type Primitive =
 export type Face = 'happy' | 'effort' | 'cool' | 'zen' | 'tired' | 'proud' | 'blink'
 
 type Prop =
-  | { type: 'barbell'; a: Point; b: Point }
+  | { type: 'barbell'; a: Point; b: Point; behind?: boolean } // behind : barre derrière la nuque
   | { type: 'kettlebell'; at: Point }
   | { type: 'trophy'; at: Point }
   | { type: 'podium' }
   | { type: 'mat' }
+
+// Variantes de dessin de Moony (à choisir)
+export type MoonyStyle = 'trait' | 'pleineLune' | 'croissant' | 'pictogramme'
+
+export const moonyStyles: { value: MoonyStyle; name: string; description: string }[] = [
+  { value: 'pleineLune', name: 'A · Pleine lune', description: 'Tête en pleine lune avec cratères, corps au trait' },
+  { value: 'croissant', name: 'B · Croissant', description: 'Un grand croissant de lune derrière la tête, comme une auréole' },
+  { value: 'trait', name: 'C · Lune & bandeau', description: 'La version actuelle, avec cratères sur le croissant' },
+  { value: 'pictogramme', name: 'D · Pictogramme', description: 'Silhouette pleine façon pictogramme sportif, tête de pleine lune' },
+]
 
 export interface Pose {
   head: Point
@@ -118,30 +130,31 @@ export const poses: Record<PoseName, Pose> = {
     facing: 1,
     face: 'happy',
   },
-  // Back squat, barre sur les épaules
+  // Back squat vu de face : barre derrière la nuque, genoux ouverts, fesses basses
   squat: {
-    head: [42, 40],
-    neck: [46, 52],
-    hip: [63, 70],
-    farArm: [[36, 58], [41, 47]],
-    nearArm: [[38, 60], [44, 48]],
-    farLeg: [[44, 72], [52, 89]],
-    nearLeg: [[47, 74], [56, 89]],
-    facing: -1,
-    face: 'effort',
-    props: [{ type: 'barbell', a: [20, 48], b: [76, 48] }],
-  },
-  deadlift: {
-    head: [50, 26],
-    neck: [50, 39],
-    hip: [50, 61],
-    farArm: [[44, 50], [42, 63]],
-    nearArm: [[56, 50], [58, 63]],
-    farLeg: [[46, 76], [44, 89]],
-    nearLeg: [[54, 76], [56, 89]],
+    head: [50, 33],
+    neck: [50, 45],
+    hip: [50, 64],
+    farArm: [[35, 56], [30, 46]],
+    nearArm: [[65, 56], [70, 46]],
+    farLeg: [[30, 71], [36, 89]],
+    nearLeg: [[70, 71], [64, 89]],
     facing: 1,
     face: 'effort',
-    props: [{ type: 'barbell', a: [15, 63], b: [85, 63] }],
+    props: [{ type: 'barbell', a: [10, 46], b: [90, 46], behind: true }],
+  },
+  // Soulevé de terre vu de face : buste penché (donc raccourci), bras tendus hors des genoux, barre aux tibias
+  deadlift: {
+    head: [50, 37],
+    neck: [50, 49],
+    hip: [50, 63],
+    farArm: [[37, 62], [34, 76]],
+    nearArm: [[63, 62], [66, 76]],
+    farLeg: [[39, 74], [41, 89]],
+    nearLeg: [[61, 74], [59, 89]],
+    facing: 1,
+    face: 'effort',
+    props: [{ type: 'barbell', a: [10, 76], b: [90, 76] }],
   },
   swingUp: {
     head: [45, 28],
@@ -354,7 +367,7 @@ const facePrimitives = (cx: number, cy: number, face: Face): Primitive[] => {
 }
 
 // Tête : disque, croissant de lune à l'arrière, bandeau, contour et visage
-const moonHead = ([cx, cy]: Point, facing: 1 | -1, face: Face): Primitive[] => {
+const moonHead = ([cx, cy]: Point, facing: 1 | -1, face: Face, withCraters = false): Primitive[] => {
   const r = HEAD_R
   const d = r * 0.62 // décalage du cercle qui "creuse" le croissant (plus petit = plus fin)
   const h = Math.sqrt(r * r - (d / 2) * (d / 2))
@@ -391,16 +404,58 @@ const moonHead = ([cx, cy]: Point, facing: 1 | -1, face: Face): Primitive[] => {
   return [
     { kind: 'circle', c: [cx, cy], r, color: 'fill' },
     { kind: 'path', d: crescent, color: 'moon' },
+    ...(withCraters ? craters(cx - facing * 1.5, cy, facing, 0.75).slice(0, 2) : []),
     { kind: 'circle', c: [cx, cy], r, color: 'none', stroke: 'ink', sw: OUTLINE },
     ...band,
     ...facePrimitives(faceX, cy + 1.5, face),
   ]
 }
 
+// Cratères posés sur l'arrière de la tête, pour laisser le visage dégagé
+const craters = (cx: number, cy: number, facing: 1 | -1, scale = 1): Primitive[] =>
+  (
+    [
+      [-5.6, -3.2, 2.1],
+      [-6.4, 3.4, 1.4],
+      [-1.2, -7, 1.2],
+    ] as const
+  ).map(([x, y, r]) => ({ kind: 'circle', c: [cx + facing * x * scale, cy + y * scale], r: r * scale, color: 'crater' }))
+
+// A · Pleine lune : disque clair cratérisé, cerné d'encre (ou sans contour en pictogramme)
+const fullMoonHead = ([cx, cy]: Point, facing: 1 | -1, face: Face, outline: boolean): Primitive[] => [
+  { kind: 'circle', c: [cx, cy], r: HEAD_R, color: 'moonPale', ...(outline ? { stroke: 'ink', sw: OUTLINE } : {}) },
+  ...craters(cx, cy, facing),
+  ...facePrimitives(cx + facing * 2, cy + 1.5, face),
+]
+
+// B · Croissant : un grand croissant de lune derrière la tête
+const crescentHaloHead = ([cx, cy]: Point, facing: 1 | -1, face: Face): Primitive[] => {
+  const R = HEAD_R * 1.55
+  const [mx, my] = [cx - facing * 3.5, cy - 2.5] // centre du croissant, un peu en arrière
+  const d = R * 0.62
+  const h = Math.sqrt(R * R - (d / 2) * (d / 2))
+  const angle = (facing === 1 ? 20 : 160) * (Math.PI / 180)
+  const rot = ([x, y]: Point): Point => [
+    mx + x * Math.cos(angle) - y * Math.sin(angle),
+    my + x * Math.sin(angle) + y * Math.cos(angle),
+  ]
+  const p1 = rot([d / 2, -h])
+  const p2 = rot([d / 2, h])
+  const crescent =
+    `M ${f(p1[0])} ${f(p1[1])} A ${R} ${R} 0 1 0 ${f(p2[0])} ${f(p2[1])} ` +
+    `A ${R} ${R} 0 0 1 ${f(p1[0])} ${f(p1[1])} Z`
+  return [
+    { kind: 'path', d: crescent, color: 'moonPale', stroke: 'ink', sw: OUTLINE },
+    ...craters(mx, my, facing, 0.9).slice(0, 2).map(c => (c.kind === 'circle' ? { ...c, c: [c.c[0] - facing * 3, c.c[1]] as Point } : c)),
+    { kind: 'circle', c: [cx, cy], r: HEAD_R * 0.92, color: 'fill', stroke: 'ink', sw: OUTLINE },
+    ...facePrimitives(cx + facing * 1, cy + 1.5, face),
+  ]
+}
+
 const propPrimitives = (prop: Prop, layer: 'back' | 'front'): Primitive[] => {
   switch (prop.type) {
     case 'barbell': {
-      if (layer === 'back') return []
+      if ((layer === 'back') !== !!prop.behind) return []
       const [a, b] = [prop.a, prop.b]
       const plate = (x: number, y: number, w: number, h: number): Primitive => ({
         kind: 'rect',
@@ -478,8 +533,10 @@ const hand = (point: Point, fill: ColorRole): Primitive => ({
 
 export const buildFigure = (
   pose: Pose,
-  options: { backdrop?: boolean; face?: Face } = {},
+  options: { backdrop?: boolean; face?: Face; style?: MoonyStyle } = {},
 ): Primitive[] => {
+  const style = options.style ?? 'trait'
+  const flat = style === 'pictogramme'
   const props = pose.props ?? []
   const groundY = props.some(p => p.type === 'podium') ? 81 : 91
   const out: Primitive[] = []
@@ -492,27 +549,46 @@ export const buildFigure = (
     pose.neck[0] + (pose.hip[0] - pose.neck[0]) * 0.14,
     pose.neck[1] + (pose.hip[1] - pose.neck[1]) * 0.14,
   ]
+  // Pictogramme : membres pleins, sans contour ni mains ni baskets
+  const limb = (points: Point[], width: number, near: boolean): Primitive[] =>
+    flat
+      ? [{ kind: 'line', points, width: width + 1.5, color: near ? 'ink' : 'farFill' }]
+      : tube(points, width, near ? 'fill' : 'farFill')
 
   // Membres de l'arrière-plan
-  out.push(...tube([pose.hip, ...pose.farLeg], LIMB_W, 'farFill'))
-  out.push(shoe(pose.farLeg[1], pose.farLeg[0], pose.facing, 'shoe'))
-  out.push(...tube([shoulder, ...pose.farArm], LIMB_W, 'farFill'))
-  out.push(hand(pose.farArm[1], 'farFill'))
+  out.push(...limb([pose.hip, ...pose.farLeg], LIMB_W, false))
+  if (!flat) out.push(shoe(pose.farLeg[1], pose.farLeg[0], pose.facing, 'shoe'))
+  out.push(...limb([shoulder, ...pose.farArm], LIMB_W, false))
+  if (!flat) out.push(hand(pose.farArm[1], 'farFill'))
 
   // Tronc
-  out.push(...tube([pose.neck, pose.hip], TORSO_W, 'fill'))
+  out.push(...limb([pose.neck, pose.hip], TORSO_W, true))
 
   // Membres du premier plan
-  out.push(...tube([pose.hip, ...pose.nearLeg], LIMB_W, 'fill'))
-  out.push(shoe(pose.nearLeg[1], pose.nearLeg[0], pose.facing, 'shoe'))
-  out.push(...tube([shoulder, ...pose.nearArm], LIMB_W, 'fill'))
-  out.push(hand(pose.nearArm[1], 'fill'))
+  out.push(...limb([pose.hip, ...pose.nearLeg], LIMB_W, true))
+  if (!flat) out.push(shoe(pose.nearLeg[1], pose.nearLeg[0], pose.facing, 'shoe'))
+  out.push(...limb([shoulder, ...pose.nearArm], LIMB_W, true))
+  if (!flat) out.push(hand(pose.nearArm[1], 'fill'))
 
   // Tête légèrement détachée du tronc
   const [dx, dy] = [pose.head[0] - pose.neck[0], pose.head[1] - pose.neck[1]]
   const len = Math.hypot(dx, dy) || 1
-  const head: Point = [pose.head[0] + (dx / len) * 1.5, pose.head[1] + (dy / len) * 1.5]
-  out.push(...moonHead(head, pose.facing, options.face ?? pose.face))
+  const gap = flat ? 3 : 1.5
+  const head: Point = [pose.head[0] + (dx / len) * gap, pose.head[1] + (dy / len) * gap]
+  const face = options.face ?? pose.face
+  switch (style) {
+    case 'pleineLune':
+      out.push(...fullMoonHead(head, pose.facing, face, true))
+      break
+    case 'pictogramme':
+      out.push(...fullMoonHead(head, pose.facing, face, false))
+      break
+    case 'croissant':
+      out.push(...crescentHaloHead(head, pose.facing, face))
+      break
+    default:
+      out.push(...moonHead(head, pose.facing, face, true))
+  }
 
   props.forEach(p => out.push(...propPrimitives(p, 'front')))
   return out

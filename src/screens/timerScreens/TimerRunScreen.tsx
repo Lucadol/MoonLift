@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native'
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 
 //React Navigation
@@ -12,6 +12,7 @@ import LoadHints from '../../components/LoadHints'
 import Mascot from '../../components/mascot/Mascot'
 import { PoseName } from '../../components/mascot/figure'
 import ProgressBar from '../../components/ProgressBar'
+import ValidationSheet from '../../components/ValidationSheet'
 import { useStore } from '../../store/StoreContext'
 import { mix, onColor } from '../../theme/palettes'
 import { makeStyles, useTheme } from '../../theme/ThemeContext'
@@ -72,6 +73,8 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
   const [elapsedMs, setElapsedMs] = useState(0) // inclut les 10 s de préparation
   const [rounds, setRounds] = useState<Record<number, number>>({}) // tours comptés par bloc (AMRAP / For Time)
   const [result, setResult] = useState('')
+  const [failedRounds, setFailedRounds] = useState<number[]>([]) // tours ratés d'un EMOM / Tabata (index 0)
+  const [isSheetVisible, setIsSheetVisible] = useState(false)
   const accumulatedMs = useRef(0)
   const startedAt = useRef<number | null>(null)
   const lastBeepKey = useRef('')
@@ -214,6 +217,7 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
     setElapsedMs(0)
     setRounds({})
     setResult('')
+    setFailedRounds([])
     setStatus('running')
     speak('Prépare-toi, dix secondes.')
   }
@@ -238,10 +242,9 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
     else skipTo(snapshot.phaseIndex + 1)
   }
 
-  const validate = () => {
-    if (!exerciseRef || !exercise) return
-    validateExercise(exerciseRef, exercise.name, result, () => navigation.goBack())
-  }
+  const toggleFailedRound = (roundIndex: number) =>
+    setFailedRounds(prev => (prev.includes(roundIndex) ? prev.filter(r => r !== roundIndex) : [...prev, roundIndex]))
+
 
   // ---- Affichage ----
 
@@ -369,6 +372,14 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
             {working && segment.type === 'FOR_TIME' && status === 'running' && (
               <Button title="Terminé !" size="lg" variant="outline" color={foreground} onPress={completeForTime} />
             )}
+            {working && phase.kind === 'work' && (config.type === 'EMOM' || config.type === 'TABATA') && (
+              <Button
+                title={failedRounds.includes(phase.round - 1) ? `↺ Tour ${phase.round} réussi finalement` : `✗ Tour ${phase.round} raté`}
+                variant="outline"
+                color={foreground}
+                onPress={() => toggleFailedRound(phase.round - 1)}
+              />
+            )}
             {working && phase.kind === 'rest' && (
               <Button
                 title="Passer le repos"
@@ -402,15 +413,18 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
             {exerciseRef ? (
               <>
                 <Text style={styles.finishTitle}>Bien joué ! 💪</Text>
-                <Text style={styles.label}>Résultat / score (optionnel)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={result}
-                  onChangeText={setResult}
-                  placeholder="ex : 5 tours + 12 reps, 60 kg…"
-                  placeholderTextColor={theme.colors.textMuted}
+                {!!result && <Text style={styles.finishText}>{result}</Text>}
+                {failedRounds.length > 0 && (
+                  <Text style={[styles.finishText, { color: theme.colors.danger }]}>
+                    {plural(failedRounds.length, 'tour')} raté{failedRounds.length > 1 ? 's' : ''}
+                  </Text>
+                )}
+                <Button
+                  title="✓ Valider l'exercice"
+                  size="lg"
+                  color={theme.colors.success}
+                  onPress={() => setIsSheetVisible(true)}
                 />
-                <Button title="✓ Valider l'exercice" size="lg" color={theme.colors.success} onPress={validate} />
                 <Button
                   title="Ne pas valider"
                   variant="ghost"
@@ -428,6 +442,21 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
           </View>
         )}
       </ScrollView>
+      {exerciseRef && exercise && (
+        <ValidationSheet
+          visible={isSheetVisible}
+          exercise={exercise}
+          initial={{ result, failedSets: failedRounds }}
+          onSubmit={(log, saveAsRecord) =>
+            validateExercise(exerciseRef, exercise, log, {
+              saveAsRecord,
+              replaceScreen: true,
+              onDone: () => navigation.goBack(),
+            })
+          }
+          onClose={() => setIsSheetVisible(false)}
+        />
+      )}
       {newRecordModal}
     </KeyboardAvoidingView>
   )
@@ -551,29 +580,17 @@ const useStyles = makeStyles(({ colors, fonts }) => ({
   finishPanel: {
     gap: 12,
   },
+  finishText: {
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+    color: colors.text,
+    textAlign: 'center',
+  },
   finishTitle: {
     fontFamily: fonts.display,
     fontSize: 22,
     letterSpacing: -0.4,
     color: colors.text,
     textAlign: 'center',
-  },
-  label: {
-    fontFamily: fonts.semibold,
-    fontSize: 12,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: colors.textMuted,
-  },
-  input: {
-    fontFamily: fonts.body,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 16,
   },
 }))

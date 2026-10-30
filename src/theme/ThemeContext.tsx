@@ -52,6 +52,8 @@ export const buildMascotColors = (accents: Accents, backdrop: string): Record<Co
     sweat: mix(accents.quaternary, '#FFFFFF', 0.45),
     shadow: ink,
     backdrop,
+    moonPale: mix(accents.tertiary, '#FFFFFF', 0.55),
+    crater: mix(accents.tertiary, '#FFFFFF', 0.2),
   }
 }
 

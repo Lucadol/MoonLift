@@ -13,20 +13,20 @@ import { useCommonStyles } from '../../components/styles'
 import { useStore } from '../../store/StoreContext'
 import { onColor } from '../../theme/palettes'
 import { makeStyles, useTheme } from '../../theme/ThemeContext'
-import { formatRecordValue, groupRecords } from '../../utils/records'
+import { estimatedOneRepMax, formatPace, formatRecordValue, groupRecords, summaryLabel } from '../../utils/records'
 
 type RecordDetailProps = StackScreenProps<RootStackParamList, 'RecordDetail'>
 
 const percentages = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95]
 
 const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
-  const { movementKey } = route.params
+  const { groupKey } = route.params
   const theme = useTheme()
   const common = useCommonStyles()
   const styles = useStyles()
   const { records } = useStore()
 
-  const summary = useMemo(() => groupRecords(records).find(m => m.key === movementKey), [records, movementKey])
+  const summary = useMemo(() => groupRecords(records).find(m => m.key === groupKey), [records, groupKey])
   if (!summary) {
     return (
       <View style={[common.screen, common.content]}>
@@ -37,16 +37,19 @@ const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
 
   return (
     <ScrollView style={common.screen} contentContainerStyle={common.content}>
-      <Text style={common.eyebrow}>Mouvement</Text>
+      <Text style={common.eyebrow}>{summaryLabel(summary)}</Text>
       <Text style={[common.title, { marginBottom: 18 }]}>{summary.movement}</Text>
 
       <View style={styles.bestCard}>
         <View style={styles.bestText}>
           <Text style={styles.bestLabel}>Meilleur record</Text>
           <Text style={styles.bestValue}>{formatRecordValue(summary.best)}</Text>
-          <Text style={styles.bestDate}>{summary.best.date}</Text>
+          <Text style={styles.bestDate}>
+            {summary.best.date}
+            {summary.kind === 'run' && formatPace(summary.best) ? ` · ${formatPace(summary.best)}` : ''}
+          </Text>
         </View>
-        <Mascot pose="flex" size={110} onBackground={theme.colors.tertiary} />
+        <Mascot pose={summary.kind === 'run' ? 'run' : 'flex'} size={110} onBackground={theme.colors.tertiary} />
       </View>
 
       {summary.history.filter(r => r.unit === summary.best.unit).length > 1 && (
@@ -58,13 +61,15 @@ const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
         </>
       )}
 
-      {(summary.best.unit === 'kg' || summary.best.unit === 'lb') && (
+      {summary.kind === 'load' && (summary.best.unit === 'kg' || summary.best.unit === 'lb') && (
         <>
-          <Text style={common.sectionTitle}>Charges de travail</Text>
+          <Text style={common.sectionTitle}>
+            Charges de travail{summary.context && summary.context !== '1RM' ? ' · 1RM estimé' : ''}
+          </Text>
           <Card style={styles.percentGrid}>
             {percentages.map(pct => {
               const step = summary.best.unit === 'kg' ? 0.5 : 1
-              const load = Math.round((summary.best.value * pct) / 100 / step) * step
+              const load = Math.round((estimatedOneRepMax([summary]) * pct) / 100 / step) * step
               return (
                 <View key={pct} style={styles.percentCell}>
                   <Text style={styles.percentLabel}>{pct} %</Text>
@@ -103,7 +108,15 @@ const RecordDetailScreen = ({ navigation, route }: RecordDetailProps) => {
       <Button
         title="+ Nouvelle entrée"
         color={theme.colors.tertiary}
-        onPress={() => navigation.navigate('RecordEdit', { movement: summary.movement })}
+        onPress={() =>
+          navigation.navigate('RecordEdit', {
+            movement: summary.movement,
+            kind: summary.kind,
+            context: summary.context,
+            unit: summary.best.unit,
+            distance: summary.best.distance,
+          })
+        }
         style={{ marginTop: 8 }}
       />
     </ScrollView>
