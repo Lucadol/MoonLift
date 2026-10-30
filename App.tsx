@@ -1,80 +1,79 @@
-import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 //Navigation
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack'
-import { createStackNavigator } from '@react-navigation/stack';
-// import { createDrawerNavigator } from '@react-navigation/drawer';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { createStackNavigator, StackNavigationOptions } from '@react-navigation/stack';
+
+//Store
+import { StoreProvider } from './src/store/StoreContext';
+import { ExerciseRef, TimerConfig, TimerType } from './src/types';
+import { colors } from './src/constants/colors';
 
 //Screen
 import Home from './src/Home';
 import TimerScreen from './src/screens/TimerScreen';
-import FollowupScreen from './src/screens/FollowupScreen';
-import EmomScreen from './src/screens/timerScreens/EmomScreen';
+import TimerSetupScreen from './src/screens/timerScreens/TimerSetupScreen';
+import TimerRunScreen from './src/screens/timerScreens/TimerRunScreen';
+import ProgramsScreen from './src/screens/programScreens/ProgramsScreen';
+import ProgramScreen from './src/screens/programScreens/ProgramScreen';
+import SessionScreen from './src/screens/programScreens/SessionScreen';
+import ExerciseEditScreen from './src/screens/programScreens/ExerciseEditScreen';
+import RecordsScreen from './src/screens/recordScreens/RecordsScreen';
+import RecordDetailScreen from './src/screens/recordScreens/RecordDetailScreen';
+import RecordEditScreen from './src/screens/recordScreens/RecordEditScreen';
 
 export type RootStackParamList = {
   Home: undefined
   Timer: undefined
-  Followup: undefined
-  Emom: undefined
+  TimerSetup: { type: TimerType }
+  TimerRun: { config: TimerConfig; exerciseRef?: ExerciseRef }
+  Programs: undefined
+  Program: { programId: string }
+  Session: { programId: string; sessionId: string }
+  ExerciseEdit: { programId: string; sessionId: string; exerciseId?: string }
+  Records: undefined
+  RecordDetail: { movementKey: string }
+  RecordEdit: { recordId?: string; movement?: string }
 }
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-export default function App() {
-  const colorScheme = useColorScheme()
-  const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+// L'application est toujours en thème sombre (cf. app.json)
+const theme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, background: colors.background },
+}
 
+const screenOptions: StackNavigationOptions = {
+  headerTitle: '', // Titre vide pour masquer le titre
+  headerBackTitleVisible: false, // Masquer le titre de retour
+  headerTintColor: 'white', // Couleur blanche pour la flèche de retour
+  headerStyle: {
+    backgroundColor: '#000', // Couleur de fond noire pour l'en-tête
+    elevation: 0, // Supprimer l'élévation (Android)
+    shadowOpacity: 0, // Supprimer l'ombre (iOS)
+  },
+}
+
+export default function App() {
   return (
-    <NavigationContainer theme={theme}>
-      <Stack.Navigator>
-        <Stack.Screen
-          name="Home"
-          component={Home}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Timer"
-          component={TimerScreen}
-          options={{
-            headerTitle: '', // Titre vide pour masquer le titre
-            headerBackTitleVisible: false, // Masquer le titre de retour
-            headerTintColor: 'white', // Couleur blanche pour la flèche de retour
-            headerStyle: {
-              backgroundColor: '#000', // Couleur de fond noire pour l'en-tête
-              elevation: 0, // Supprimer l'élévation (Android)
-            }
-          }}
-        />
-        <Stack.Screen 
-          name="Followup"
-          component={FollowupScreen} 
-          options={{
-            headerTitle: '',
-            headerBackTitleVisible: false,
-            headerTintColor: 'white',
-            headerStyle: {
-              backgroundColor: '#000',
-              elevation: 0,
-            }
-          }}
-        />
-        <Stack.Screen
-          name="Emom"
-          component={EmomScreen}
-          options={{
-            headerTitle: '',
-            headerBackTitleVisible: false,
-            headerTintColor: 'white',
-            headerStyle: {
-              backgroundColor: '#000',
-              elevation: 0,
-            }
-          }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <StoreProvider>
+      <NavigationContainer theme={theme}>
+        <StatusBar style="light" />
+        <Stack.Navigator screenOptions={screenOptions}>
+          <Stack.Screen name="Home" component={Home} options={{ headerShown: false }} />
+          <Stack.Screen name="Timer" component={TimerScreen} />
+          <Stack.Screen name="TimerSetup" component={TimerSetupScreen} />
+          <Stack.Screen name="TimerRun" component={TimerRunScreen} options={{ gestureEnabled: false }} />
+          <Stack.Screen name="Programs" component={ProgramsScreen} />
+          <Stack.Screen name="Program" component={ProgramScreen} />
+          <Stack.Screen name="Session" component={SessionScreen} />
+          <Stack.Screen name="ExerciseEdit" component={ExerciseEditScreen} />
+          <Stack.Screen name="Records" component={RecordsScreen} />
+          <Stack.Screen name="RecordDetail" component={RecordDetailScreen} />
+          <Stack.Screen name="RecordEdit" component={RecordEditScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </StoreProvider>
   );
 }
-  
-  

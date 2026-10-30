@@ -1,10 +1,11 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 
 //React Navigation
-import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../App'
+import { colors } from './constants/colors'
 
-type HomeProps = NativeStackScreenProps<RootStackParamList, 'Home'>
+type HomeProps = StackScreenProps<RootStackParamList, 'Home'>
 
 const Home = ({navigation}: HomeProps) => {
   return (
@@ -12,16 +13,22 @@ const Home = ({navigation}: HomeProps) => {
     <Text style={styles.title}>MoonLift</Text>
     <View style={styles.contentContainer}>
       <Pressable
-        style={styles.timerText}
+        style={[styles.button, styles.timer]}
         onPress={() => navigation.navigate('Timer')}
       >
         <Text style={styles.buttonText}>TIMER</Text>
       </Pressable>
       <Pressable
-        style={styles.followupText}
-        onPress={() => navigation.navigate('Followup')}
+        style={[styles.button, styles.program]}
+        onPress={() => navigation.navigate('Programs')}
       >
-        <Text style={styles.buttonText}>FOLLOW-UP</Text>
+        <Text style={styles.buttonText}>PROGRAMME</Text>
+      </Pressable>
+      <Pressable
+        style={[styles.button, styles.records]}
+        onPress={() => navigation.navigate('Records')}
+      >
+        <Text style={styles.buttonText}>MES PR</Text>
       </Pressable>
     </View>
   </View>
@@ -35,6 +42,7 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: colors.background,
       },
       title: {
         fontSize: 30,
@@ -46,19 +54,20 @@ const styles = StyleSheet.create({
         padding: 20,
         alignItems: 'center'
       },
-      timerText: {
-        backgroundColor: '#FF3E4D',
+      button: {
         width: 250,
         padding: 10,
         margin: 10,
         borderRadius: 25,
       },
-      followupText: {
-        backgroundColor: '#3498DB',
-        width: 250,
-        padding: 10,
-        margin: 10,
-        borderRadius: 25,
+      timer: {
+        backgroundColor: colors.red,
+      },
+      program: {
+        backgroundColor: colors.blue,
+      },
+      records: {
+        backgroundColor: colors.orange,
       },
       buttonText: {
         color: 'white',

@@ -1,31 +1,31 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 //React Navigation
-import { NativeStackScreenProps } from '@react-navigation/native-stack'
+import { StackScreenProps } from '@react-navigation/stack'
 import { RootStackParamList } from '../../App'
+import { colors, timerColors } from '../constants/colors'
+import { TimerType } from '../types'
+import { timerDescriptions, timerLabels } from '../utils/timer'
 
-type TimerProps = NativeStackScreenProps<RootStackParamList, 'Timer'>
+type TimerProps = StackScreenProps<RootStackParamList, 'Timer'>
+
+const timerTypes: TimerType[] = ['AMRAP', 'EMOM', 'TABATA', 'FOR_TIME']
 
 const TimerScreen = ({navigation}: TimerProps) => {
   return (
     <View style={styles.container}>
     <Text style={styles.title}>Chrono</Text>
     <View style={styles.contentContainer}>
-      <Pressable style={[styles.button, styles.amrap]}>
-        <Text style={styles.buttonText}>AMRAP</Text>
-      </Pressable>
-      <Pressable
-        style={[styles.button, styles.emom]}
-        onPress={() => navigation.navigate('Emom')}
-      >
-        <Text style={styles.buttonText}>EMOM</Text>
-      </Pressable>
-      <Pressable style={[styles.button, styles.tabata]}>
-        <Text style={styles.buttonText}>TABATA</Text>
-      </Pressable>
-      <Pressable style={[styles.button, styles.mix]}>
-        <Text style={styles.buttonText}>MIX</Text>
-      </Pressable>
+      {timerTypes.map(type => (
+        <Pressable
+          key={type}
+          style={[styles.button, { backgroundColor: timerColors[type] }]}
+          onPress={() => navigation.navigate('TimerSetup', { type })}
+        >
+          <Text style={styles.buttonText}>{timerLabels[type]}</Text>
+          <Text style={styles.description}>{timerDescriptions[type]}</Text>
+        </Pressable>
+      ))}
     </View>
   </View>
   )
@@ -38,6 +38,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   title: {
     fontSize: 30,
@@ -50,22 +51,10 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   button: {
-    width: 250,
+    width: 280,
     padding: 10,
     margin: 10,
     borderRadius: 25,
-  },
-  amrap: {
-    backgroundColor: '#3498DB',
-  },
-  emom: {
-    backgroundColor: '#9B59B6',
-  },
-  tabata: {
-    backgroundColor: '#2ECC71',
-  },
-  mix: {
-    backgroundColor: '#F1C40F',
   },
   buttonText: {
     color: 'white',
@@ -73,5 +62,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '500',
   },
+  description: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    textAlign: 'center',
+    fontSize: 13,
+    marginTop: 2,
+  },
 })
-
