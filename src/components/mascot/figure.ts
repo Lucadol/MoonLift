@@ -1,39 +1,18 @@
-// "Moony", la mascotte de l'app : un petit athlète à tête de lune, dessiné au trait.
+// "Moony", la mascotte de l'app : une silhouette pleine à tête de lune.
+// Pendant le timer, sa tête passe par les phases de la lune (du fin croissant à la pleine lune).
 // Ce module est purement géométrique (aucune dépendance React) : il transforme une pose en
-// primitives SVG, rendues ensuite par <Mascot /> avec les couleurs du thème.
+// primitives SVG, rendues ensuite par <Mascot /> avec les couleurs du thème (ou du fond).
 
 export type Point = [number, number]
 
-export type ColorRole =
-  | 'ink' // contours et visage
-  | 'fill' // corps
-  | 'farFill' // membres à l'arrière-plan
-  | 'moon' // croissant de lune sur la tête
-  | 'band' // bandeau de sport
-  | 'shoe' // baskets
-  | 'accent' // disques de la barre, kettlebell, tapis
-  | 'gold' // trophée, podium
-  | 'cheek' // joues
-  | 'sweat' // goutte de sueur
-  | 'shadow'
-  | 'backdrop'
-  | 'moonPale' // disque de pleine lune
-  | 'crater' // cratères
-
-interface Stroke {
-  stroke?: ColorRole
-  sw?: number // épaisseur du contour
-}
+export type ColorRole = 'ink' | 'far' | 'moon' | 'moonShade' | 'accent' | 'gold' | 'shadow' | 'backdrop'
 
 export type Primitive =
   | { kind: 'line'; points: Point[]; width: number; color: ColorRole }
-  | ({ kind: 'circle'; c: Point; r: number; color: ColorRole | 'none'; opacity?: number } & Stroke)
-  | ({ kind: 'ellipse'; c: Point; rx: number; ry: number; color: ColorRole | 'none'; opacity?: number } & Stroke)
-  | ({ kind: 'rect'; x: number; y: number; w: number; h: number; r: number; color: ColorRole | 'none' } & Stroke)
-  | ({ kind: 'path'; d: string; color: ColorRole | 'none'; opacity?: number } & Stroke)
-
-// Expressions du visage
-export type Face = 'happy' | 'effort' | 'cool' | 'zen' | 'tired' | 'proud' | 'blink'
+  | { kind: 'circle'; c: Point; r: number; color: ColorRole; opacity?: number }
+  | { kind: 'ellipse'; c: Point; rx: number; ry: number; color: ColorRole; opacity?: number }
+  | { kind: 'rect'; x: number; y: number; w: number; h: number; r: number; color: ColorRole }
+  | { kind: 'path'; d: string; color: ColorRole; opacity?: number }
 
 type Prop =
   | { type: 'barbell'; a: Point; b: Point; behind?: boolean } // behind : barre derrière la nuque
@@ -42,27 +21,16 @@ type Prop =
   | { type: 'podium' }
   | { type: 'mat' }
 
-// Variantes de dessin de Moony (à choisir)
-export type MoonyStyle = 'trait' | 'pleineLune' | 'croissant' | 'pictogramme'
-
-export const moonyStyles: { value: MoonyStyle; name: string; description: string }[] = [
-  { value: 'pleineLune', name: 'A · Pleine lune', description: 'Tête en pleine lune avec cratères, corps au trait' },
-  { value: 'croissant', name: 'B · Croissant', description: 'Un grand croissant de lune derrière la tête, comme une auréole' },
-  { value: 'trait', name: 'C · Lune & bandeau', description: 'La version actuelle, avec cratères sur le croissant' },
-  { value: 'pictogramme', name: 'D · Pictogramme', description: 'Silhouette pleine façon pictogramme sportif, tête de pleine lune' },
-]
-
 export interface Pose {
   head: Point
   neck: Point
   hip: Point
-  // Bras et jambe "loin" (dessinés derrière, en plus foncé) puis "près"
+  // Bras et jambe "loin" (dessinés en clair derrière) puis "près"
   farArm: [Point, Point]
   nearArm: [Point, Point]
   farLeg: [Point, Point]
   nearLeg: [Point, Point]
-  facing: 1 | -1 // côté vers lequel regarde Moony
-  face: Face
+  facing: 1 | -1 // côté vers lequel regarde Moony (la lune est éclairée à l'arrière)
   props?: Prop[]
 }
 
@@ -93,7 +61,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[42, 78], [37, 90]],
     nearLeg: [[58, 78], [63, 90]],
     facing: 1,
-    face: 'proud',
     props: [{ type: 'barbell', a: [9, 14], b: [91, 14] }],
   },
   run: {
@@ -105,7 +72,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[37, 72], [25, 77]],
     nearLeg: [[60, 71], [57, 88]],
     facing: 1,
-    face: 'happy',
   },
   jack: {
     head: [50, 27],
@@ -116,7 +82,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[41, 76], [33, 89]],
     nearLeg: [[59, 76], [67, 89]],
     facing: 1,
-    face: 'happy',
   },
   // Salut de la main
   wave: {
@@ -128,7 +93,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[44, 76], [42, 89]],
     nearLeg: [[53, 76], [55, 89]],
     facing: 1,
-    face: 'happy',
   },
   // Back squat vu de face : barre derrière la nuque, genoux ouverts, fesses basses
   squat: {
@@ -140,7 +104,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[30, 71], [36, 89]],
     nearLeg: [[70, 71], [64, 89]],
     facing: 1,
-    face: 'effort',
     props: [{ type: 'barbell', a: [10, 46], b: [90, 46], behind: true }],
   },
   // Soulevé de terre vu de face : buste penché (donc raccourci), bras tendus hors des genoux, barre aux tibias
@@ -153,7 +116,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[39, 74], [41, 89]],
     nearLeg: [[61, 74], [59, 89]],
     facing: 1,
-    face: 'effort',
     props: [{ type: 'barbell', a: [10, 76], b: [90, 76] }],
   },
   swingUp: {
@@ -165,7 +127,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[46, 76], [43, 89]],
     nearLeg: [[53, 76], [54, 89]],
     facing: 1,
-    face: 'effort',
     props: [{ type: 'kettlebell', at: [76, 41] }],
   },
   swingDown: {
@@ -177,7 +138,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[47, 77], [40, 89]],
     nearLeg: [[51, 77], [48, 89]],
     facing: 1,
-    face: 'effort',
     props: [{ type: 'kettlebell', at: [51, 79] }],
   },
   // Repos : mains sur les hanches
@@ -190,7 +150,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[46, 76], [44, 89]],
     nearLeg: [[54, 76], [56, 89]],
     facing: 1,
-    face: 'tired',
   },
   restBreath: {
     head: [50, 29],
@@ -201,7 +160,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[46, 77], [44, 89]],
     nearLeg: [[54, 77], [56, 89]],
     facing: 1,
-    face: 'tired',
   },
   trophy: {
     head: [48, 24],
@@ -212,7 +170,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[46, 69], [44, 80]],
     nearLeg: [[54, 69], [56, 80]],
     facing: 1,
-    face: 'proud',
     props: [{ type: 'podium' }, { type: 'trophy', at: [67, 13] }],
   },
   // Double biceps
@@ -225,7 +182,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[44, 76], [39, 89]],
     nearLeg: [[56, 76], [61, 89]],
     facing: 1,
-    face: 'cool',
   },
   // Assis en tailleur sur un tapis
   meditate: {
@@ -237,7 +193,6 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[30, 80], [56, 84]],
     nearLeg: [[70, 80], [44, 84]],
     facing: 1,
-    face: 'zen',
     props: [{ type: 'mat' }],
   },
   // Allongé, il fait la sieste (écrans vides)
@@ -250,206 +205,41 @@ export const poses: Record<PoseName, Pose> = {
     farLeg: [[68, 74], [80, 80]],
     nearLeg: [[70, 82], [84, 85]],
     facing: -1,
-    face: 'zen',
     props: [{ type: 'mat' }],
   },
 }
 
-const HEAD_R = 10
-const LIMB_W = 5.6
-const TORSO_W = 12
-const OUTLINE = 1.9 // épaisseur du trait de contour
+const HEAD_R = 8.8
+const LIMB_W = 7.5
+const TORSO_W = 11
+
+// Phase de Moony hors du timer : son croissant habituel
+export const DEFAULT_PHASE = 0.4
 
 const f = (n: number) => n.toFixed(2)
 
-// Un membre « au trait » : un trait épais d'encre, puis le remplissage par-dessus
-const tube = (points: Point[], width: number, fill: ColorRole): Primitive[] => [
-  { kind: 'line', points, width: width + OUTLINE * 2, color: 'ink' },
-  { kind: 'line', points, width, color: fill },
-]
-
-// Visage : yeux, bouche, joues, selon l'expression
-const facePrimitives = (cx: number, cy: number, face: Face): Primitive[] => {
-  const out: Primitive[] = []
-  const eyeY = cy - 0.5
-  const [lx, rx] = [cx - 3.4, cx + 3.4]
-  const stroke = (d: string, sw = 1.5): Primitive => ({ kind: 'path', d, color: 'none', stroke: 'ink', sw })
-
-  // Yeux
-  switch (face) {
-    case 'happy':
-    case 'tired':
-      if (face === 'tired') {
-        out.push(stroke(`M ${lx - 1.6} ${eyeY} L ${lx + 1.6} ${eyeY}`), stroke(`M ${rx - 1.6} ${eyeY} L ${rx + 1.6} ${eyeY}`))
-      } else {
-        out.push(
-          { kind: 'ellipse', c: [lx, eyeY], rx: 1.25, ry: 1.65, color: 'ink' },
-          { kind: 'ellipse', c: [rx, eyeY], rx: 1.25, ry: 1.65, color: 'ink' },
-        )
-      }
-      break
-    case 'effort':
-      // > <
-      out.push(
-        stroke(`M ${lx - 1.5} ${eyeY - 1.4} L ${lx + 1.2} ${eyeY} L ${lx - 1.5} ${eyeY + 1.4}`),
-        stroke(`M ${rx + 1.5} ${eyeY - 1.4} L ${rx - 1.2} ${eyeY} L ${rx + 1.5} ${eyeY + 1.4}`),
-      )
-      break
-    case 'proud':
-      // ^ ^
-      out.push(
-        stroke(`M ${lx - 1.6} ${eyeY + 0.8} Q ${lx} ${eyeY - 1.8} ${lx + 1.6} ${eyeY + 0.8}`),
-        stroke(`M ${rx - 1.6} ${eyeY + 0.8} Q ${rx} ${eyeY - 1.8} ${rx + 1.6} ${eyeY + 0.8}`),
-      )
-      break
-    case 'zen':
-    case 'blink':
-      // ‿ ‿
-      out.push(
-        stroke(`M ${lx - 1.6} ${eyeY - 0.3} Q ${lx} ${eyeY + 1.6} ${lx + 1.6} ${eyeY - 0.3}`),
-        stroke(`M ${rx - 1.6} ${eyeY - 0.3} Q ${rx} ${eyeY + 1.6} ${rx + 1.6} ${eyeY - 0.3}`),
-      )
-      break
-    case 'cool':
-      // Lunettes de soleil
-      out.push(
-        { kind: 'path', d: `M ${cx - 7} ${eyeY - 2} L ${cx + 7} ${eyeY - 2}`, color: 'none', stroke: 'ink', sw: 1.2 },
-        { kind: 'path', d: `M ${lx - 2.8} ${eyeY - 2} L ${lx + 2.6} ${eyeY - 2} L ${lx + 2.1} ${eyeY + 1.2} Q ${lx} ${eyeY + 2.8} ${lx - 2.3} ${eyeY + 1.2} Z`, color: 'ink' },
-        { kind: 'path', d: `M ${rx - 2.6} ${eyeY - 2} L ${rx + 2.8} ${eyeY - 2} L ${rx + 2.3} ${eyeY + 1.2} Q ${rx} ${eyeY + 2.8} ${rx - 2.1} ${eyeY + 1.2} Z`, color: 'ink' },
-      )
-      break
-  }
-
-  // Joues
-  if (face !== 'cool') {
-    out.push(
-      { kind: 'ellipse', c: [lx - 1.6, cy + 2.6], rx: 1.7, ry: 1.1, color: 'cheek', opacity: 0.55 },
-      { kind: 'ellipse', c: [rx + 1.6, cy + 2.6], rx: 1.7, ry: 1.1, color: 'cheek', opacity: 0.55 },
-    )
-  }
-
-  // Bouche
-  const my = cy + 3.6
-  switch (face) {
-    case 'happy':
-    case 'blink':
-      out.push(stroke(`M ${cx - 2.4} ${my - 0.4} Q ${cx} ${my + 2.4} ${cx + 2.4} ${my - 0.4}`))
-      break
-    case 'proud':
-      out.push({ kind: 'path', d: `M ${cx - 3} ${my - 0.8} Q ${cx} ${my + 4} ${cx + 3} ${my - 0.8} Z`, color: 'ink' })
-      break
-    case 'effort':
-      out.push({ kind: 'rect', x: cx - 2.4, y: my - 1, w: 4.8, h: 2.4, r: 1, color: 'fill', stroke: 'ink', sw: 1.2 })
-      break
-    case 'tired':
-      out.push({ kind: 'ellipse', c: [cx, my + 0.4], rx: 1.3, ry: 1.7, color: 'ink' })
-      break
-    case 'zen':
-      out.push(stroke(`M ${cx - 1.6} ${my} Q ${cx} ${my + 1.4} ${cx + 1.6} ${my}`))
-      break
-    case 'cool':
-      out.push(stroke(`M ${cx - 2.6} ${my + 0.4} Q ${cx + 0.5} ${my + 2} ${cx + 2.8} ${my - 0.8}`))
-      break
-  }
-
-  // Goutte de sueur
-  if (face === 'tired' || face === 'effort') {
-    const [sx, sy] = [cx + 9.5, cy - 6]
-    out.push({
-      kind: 'path',
-      d: `M ${sx} ${sy - 3} Q ${sx + 2.3} ${sy + 0.6} ${sx} ${sy + 1.6} Q ${sx - 2.3} ${sy + 0.6} ${sx} ${sy - 3} Z`,
-      color: 'sweat',
-      stroke: 'ink',
-      sw: 0.9,
-    })
-  }
-  return out
-}
-
-// Tête : disque, croissant de lune à l'arrière, bandeau, contour et visage
-const moonHead = ([cx, cy]: Point, facing: 1 | -1, face: Face, withCraters = false): Primitive[] => {
+// Tête en phase de lune : p = 0 nouvelle lune, 0,5 demi-lune, 1 pleine lune.
+// Le côté éclairé est à l'arrière de la tête, vers le haut.
+const moonHead = ([cx, cy]: Point, facing: 1 | -1, phase: number): Primitive[] => {
   const r = HEAD_R
-  const d = r * 0.62 // décalage du cercle qui "creuse" le croissant (plus petit = plus fin)
-  const h = Math.sqrt(r * r - (d / 2) * (d / 2))
-  // Le croissant est à l'arrière de la tête, vers le haut
-  const angle = (facing === 1 ? 35 : 145) * (Math.PI / 180)
+  const out: Primitive[] = [{ kind: 'circle', c: [cx, cy], r, color: 'moonShade' }]
+  const p = Math.min(1, Math.max(0, phase))
+  if (p >= 0.99) return [...out, { kind: 'circle', c: [cx, cy], r, color: 'moon' }]
+  if (p <= 0.01) return out
+  // Demi-cercle éclairé + terminateur elliptique, dans un repère tourné vers l'arrière de la tête
+  const angle = ((facing === 1 ? 215 : -35) * Math.PI) / 180
   const rot = ([x, y]: Point): Point => [
     cx + x * Math.cos(angle) - y * Math.sin(angle),
     cy + x * Math.sin(angle) + y * Math.cos(angle),
   ]
-  const p1 = rot([d / 2, -h])
-  const p2 = rot([d / 2, h])
-  const crescent =
-    `M ${f(p1[0])} ${f(p1[1])} ` +
-    `A ${r} ${r} 0 1 0 ${f(p2[0])} ${f(p2[1])} ` +
-    `A ${r} ${r} 0 0 1 ${f(p1[0])} ${f(p1[1])} Z`
-
-  // Bandeau : une corde du cercle un peu au-dessus des yeux, avec ses deux pans qui flottent
-  const by = cy - 5.2
-  const bx = Math.sqrt(r * r - (by - cy) ** 2)
-  const tail = cx - facing * bx
-  const band: Primitive[] = [
-    { kind: 'line', points: [[cx - bx + 0.6, by], [cx + bx - 0.6, by]], width: 3.4 + OUTLINE * 1.4, color: 'ink' },
-    { kind: 'line', points: [[cx - bx + 0.6, by], [cx + bx - 0.6, by]], width: 3.4, color: 'band' },
-    {
-      kind: 'path',
-      d: `M ${tail} ${by} q ${-facing * 4} ${-1} ${-facing * 6.5} ${2.5} q ${facing * 3} ${-0.4} ${facing * 4.5} ${-1.2} Z`,
-      color: 'band',
-      stroke: 'ink',
-      sw: 1.1,
-    },
-  ]
-
-  const faceX = cx + facing * 1.2
-  return [
-    { kind: 'circle', c: [cx, cy], r, color: 'fill' },
-    { kind: 'path', d: crescent, color: 'moon' },
-    ...(withCraters ? craters(cx - facing * 1.5, cy, facing, 0.75).slice(0, 2) : []),
-    { kind: 'circle', c: [cx, cy], r, color: 'none', stroke: 'ink', sw: OUTLINE },
-    ...band,
-    ...facePrimitives(faceX, cy + 1.5, face),
-  ]
-}
-
-// Cratères posés sur l'arrière de la tête, pour laisser le visage dégagé
-const craters = (cx: number, cy: number, facing: 1 | -1, scale = 1): Primitive[] =>
-  (
-    [
-      [-5.6, -3.2, 2.1],
-      [-6.4, 3.4, 1.4],
-      [-1.2, -7, 1.2],
-    ] as const
-  ).map(([x, y, r]) => ({ kind: 'circle', c: [cx + facing * x * scale, cy + y * scale], r: r * scale, color: 'crater' }))
-
-// A · Pleine lune : disque clair cratérisé, cerné d'encre (ou sans contour en pictogramme)
-const fullMoonHead = ([cx, cy]: Point, facing: 1 | -1, face: Face, outline: boolean): Primitive[] => [
-  { kind: 'circle', c: [cx, cy], r: HEAD_R, color: 'moonPale', ...(outline ? { stroke: 'ink', sw: OUTLINE } : {}) },
-  ...craters(cx, cy, facing),
-  ...facePrimitives(cx + facing * 2, cy + 1.5, face),
-]
-
-// B · Croissant : un grand croissant de lune derrière la tête
-const crescentHaloHead = ([cx, cy]: Point, facing: 1 | -1, face: Face): Primitive[] => {
-  const R = HEAD_R * 1.55
-  const [mx, my] = [cx - facing * 3.5, cy - 2.5] // centre du croissant, un peu en arrière
-  const d = R * 0.62
-  const h = Math.sqrt(R * R - (d / 2) * (d / 2))
-  const angle = (facing === 1 ? 20 : 160) * (Math.PI / 180)
-  const rot = ([x, y]: Point): Point => [
-    mx + x * Math.cos(angle) - y * Math.sin(angle),
-    my + x * Math.sin(angle) + y * Math.cos(angle),
-  ]
-  const p1 = rot([d / 2, -h])
-  const p2 = rot([d / 2, h])
-  const crescent =
-    `M ${f(p1[0])} ${f(p1[1])} A ${R} ${R} 0 1 0 ${f(p2[0])} ${f(p2[1])} ` +
-    `A ${R} ${R} 0 0 1 ${f(p1[0])} ${f(p1[1])} Z`
-  return [
-    { kind: 'path', d: crescent, color: 'moonPale', stroke: 'ink', sw: OUTLINE },
-    ...craters(mx, my, facing, 0.9).slice(0, 2).map(c => (c.kind === 'circle' ? { ...c, c: [c.c[0] - facing * 3, c.c[1]] as Point } : c)),
-    { kind: 'circle', c: [cx, cy], r: HEAD_R * 0.92, color: 'fill', stroke: 'ink', sw: OUTLINE },
-    ...facePrimitives(cx + facing * 1, cy + 1.5, face),
-  ]
+  const top = rot([0, -r])
+  const bottom = rot([0, r])
+  const rx = r * Math.abs(1 - 2 * p)
+  const deg = (angle * 180) / Math.PI
+  const d =
+    `M ${f(top[0])} ${f(top[1])} A ${r} ${r} 0 0 1 ${f(bottom[0])} ${f(bottom[1])} ` +
+    `A ${f(rx)} ${r} ${f(deg)} 0 ${p < 0.5 ? 0 : 1} ${f(top[0])} ${f(top[1])} Z`
+  return [...out, { kind: 'path', d, color: 'moon' }]
 }
 
 const propPrimitives = (prop: Prop, layer: 'back' | 'front'): Primitive[] => {
@@ -465,80 +255,48 @@ const propPrimitives = (prop: Prop, layer: 'back' | 'front'): Primitive[] => {
         h,
         r: 1.8,
         color: 'accent',
-        stroke: 'ink',
-        sw: 1.3,
       })
       return [
         { kind: 'line', points: [a, b], width: 2.4, color: 'ink' },
-        plate(a[0] + 4, a[1], 5, 17),
-        plate(a[0] + 8.5, a[1], 3.6, 11),
-        plate(b[0] - 4, b[1], 5, 17),
-        plate(b[0] - 8.5, b[1], 3.6, 11),
+        plate(a[0] + 4, a[1], 5, 16),
+        plate(a[0] + 8.5, a[1], 3.5, 11),
+        plate(b[0] - 4, b[1], 5, 16),
+        plate(b[0] - 8.5, b[1], 3.5, 11),
       ]
     }
     case 'kettlebell': {
       if (layer === 'back') return []
       const [x, y] = prop.at
       return [
-        { kind: 'path', d: `M ${x - 3.2} ${y + 3} L ${x - 3.2} ${y - 0.5} Q ${x} ${y - 3} ${x + 3.2} ${y - 0.5} L ${x + 3.2} ${y + 3}`, color: 'none', stroke: 'ink', sw: 2 },
-        { kind: 'circle', c: [x, y + 6.5], r: 5.6, color: 'accent', stroke: 'ink', sw: 1.4 },
+        { kind: 'line', points: [[x - 3, y + 2], [x - 3, y - 1], [x + 3, y - 1], [x + 3, y + 2]], width: 2, color: 'ink' },
+        { kind: 'circle', c: [x, y + 6.5], r: 5.6, color: 'accent' },
       ]
     }
     case 'trophy': {
       if (layer === 'back') return []
       const [x, y] = prop.at
       return [
-        { kind: 'path', d: `M ${x - 6} ${y - 8} L ${x + 6} ${y - 8} L ${x + 5} ${y - 3} A 5 5 0 0 1 ${x - 5} ${y - 3} Z`, color: 'gold', stroke: 'ink', sw: 1.2 },
-        { kind: 'rect', x: x - 1, y: y - 1.5, w: 2, h: 3.5, r: 0.5, color: 'gold', stroke: 'ink', sw: 0.9 },
-        { kind: 'rect', x: x - 4, y: y + 1.8, w: 8, h: 2.6, r: 1, color: 'gold', stroke: 'ink', sw: 1 },
+        { kind: 'path', d: `M ${x - 6} ${y - 8} L ${x + 6} ${y - 8} L ${x + 5} ${y - 3} A 5 5 0 0 1 ${x - 5} ${y - 3} Z`, color: 'gold' },
+        { kind: 'rect', x: x - 1, y: y - 2, w: 2, h: 4, r: 0.5, color: 'gold' },
+        { kind: 'rect', x: x - 4, y: y + 1.5, w: 8, h: 2.5, r: 1, color: 'gold' },
       ]
     }
     case 'podium':
       return layer === 'back'
         ? [
-            { kind: 'rect', x: 12, y: 86, w: 18, h: 7, r: 2, color: 'farFill', stroke: 'ink', sw: 1.3 },
-            { kind: 'rect', x: 70, y: 88, w: 18, h: 5, r: 2, color: 'farFill', stroke: 'ink', sw: 1.3 },
-            { kind: 'rect', x: 30, y: 80.5, w: 40, h: 12.5, r: 2, color: 'gold', stroke: 'ink', sw: 1.3 },
+            { kind: 'rect', x: 30, y: 80.5, w: 40, h: 12.5, r: 2, color: 'gold' },
+            { kind: 'rect', x: 12, y: 86, w: 18, h: 7, r: 2, color: 'far' },
+            { kind: 'rect', x: 70, y: 88, w: 18, h: 5, r: 2, color: 'far' },
           ]
         : []
     case 'mat':
-      return layer === 'back'
-        ? [{ kind: 'rect', x: 12, y: 86, w: 76, h: 5, r: 2.5, color: 'accent', stroke: 'ink', sw: 1.3 }]
-        : []
+      return layer === 'back' ? [{ kind: 'rect', x: 14, y: 86, w: 72, h: 5, r: 2.5, color: 'accent' }] : []
   }
 }
 
-// Basket au bout de la jambe, orientée vers l'avant
-const shoe = (foot: Point, knee: Point, facing: 1 | -1, fill: ColorRole): Primitive => {
-  const dir = Math.abs(foot[1] - knee[1]) > Math.abs(foot[0] - knee[0]) ? facing : Math.sign(foot[0] - knee[0]) || facing
-  return {
-    kind: 'ellipse',
-    c: [foot[0] + dir * 1.6, foot[1] + 0.6],
-    rx: 4.4,
-    ry: 2.6,
-    color: fill,
-    stroke: 'ink',
-    sw: OUTLINE * 0.8,
-  }
-}
-
-const hand = (point: Point, fill: ColorRole): Primitive => ({
-  kind: 'circle',
-  c: point,
-  r: 3.1,
-  color: fill,
-  stroke: 'ink',
-  sw: OUTLINE * 0.8,
-})
-
-export const buildFigure = (
-  pose: Pose,
-  options: { backdrop?: boolean; face?: Face; style?: MoonyStyle } = {},
-): Primitive[] => {
-  const style = options.style ?? 'trait'
-  const flat = style === 'pictogramme'
+export const buildFigure = (pose: Pose, options: { backdrop?: boolean; phase?: number } = {}): Primitive[] => {
   const props = pose.props ?? []
-  const groundY = props.some(p => p.type === 'podium') ? 81 : 91
+  const groundY = props.some(p => p.type === 'podium') ? 81 : 92
   const out: Primitive[] = []
   if (options.backdrop) out.push({ kind: 'circle', c: [50, 54], r: 43, color: 'backdrop' })
   out.push({ kind: 'ellipse', c: [50, groundY + 1], rx: 22, ry: 2.5, color: 'shadow', opacity: 0.12 })
@@ -546,49 +304,20 @@ export const buildFigure = (
 
   // Les bras partent des épaules, un peu sous le haut du tronc
   const shoulder: Point = [
-    pose.neck[0] + (pose.hip[0] - pose.neck[0]) * 0.14,
-    pose.neck[1] + (pose.hip[1] - pose.neck[1]) * 0.14,
+    pose.neck[0] + (pose.hip[0] - pose.neck[0]) * 0.12,
+    pose.neck[1] + (pose.hip[1] - pose.neck[1]) * 0.12,
   ]
-  // Pictogramme : membres pleins, sans contour ni mains ni baskets
-  const limb = (points: Point[], width: number, near: boolean): Primitive[] =>
-    flat
-      ? [{ kind: 'line', points, width: width + 1.5, color: near ? 'ink' : 'farFill' }]
-      : tube(points, width, near ? 'fill' : 'farFill')
+  // Membres "loin" en clair, puis le tronc, puis les membres "près"
+  out.push({ kind: 'line', points: [pose.hip, ...pose.farLeg], width: LIMB_W, color: 'far' })
+  out.push({ kind: 'line', points: [shoulder, ...pose.farArm], width: LIMB_W, color: 'far' })
+  out.push({ kind: 'line', points: [pose.neck, pose.hip], width: TORSO_W, color: 'ink' })
+  out.push({ kind: 'line', points: [pose.hip, ...pose.nearLeg], width: LIMB_W, color: 'ink' })
+  out.push({ kind: 'line', points: [shoulder, ...pose.nearArm], width: LIMB_W, color: 'ink' })
 
-  // Membres de l'arrière-plan
-  out.push(...limb([pose.hip, ...pose.farLeg], LIMB_W, false))
-  if (!flat) out.push(shoe(pose.farLeg[1], pose.farLeg[0], pose.facing, 'shoe'))
-  out.push(...limb([shoulder, ...pose.farArm], LIMB_W, false))
-  if (!flat) out.push(hand(pose.farArm[1], 'farFill'))
-
-  // Tronc
-  out.push(...limb([pose.neck, pose.hip], TORSO_W, true))
-
-  // Membres du premier plan
-  out.push(...limb([pose.hip, ...pose.nearLeg], LIMB_W, true))
-  if (!flat) out.push(shoe(pose.nearLeg[1], pose.nearLeg[0], pose.facing, 'shoe'))
-  out.push(...limb([shoulder, ...pose.nearArm], LIMB_W, true))
-  if (!flat) out.push(hand(pose.nearArm[1], 'fill'))
-
-  // Tête légèrement détachée du tronc
+  // La tête est légèrement détachée du tronc, façon pictogramme
   const [dx, dy] = [pose.head[0] - pose.neck[0], pose.head[1] - pose.neck[1]]
   const len = Math.hypot(dx, dy) || 1
-  const gap = flat ? 3 : 1.5
-  const head: Point = [pose.head[0] + (dx / len) * gap, pose.head[1] + (dy / len) * gap]
-  const face = options.face ?? pose.face
-  switch (style) {
-    case 'pleineLune':
-      out.push(...fullMoonHead(head, pose.facing, face, true))
-      break
-    case 'pictogramme':
-      out.push(...fullMoonHead(head, pose.facing, face, false))
-      break
-    case 'croissant':
-      out.push(...crescentHaloHead(head, pose.facing, face))
-      break
-    default:
-      out.push(...moonHead(head, pose.facing, face, true))
-  }
+  out.push(...moonHead([pose.head[0] + (dx / len) * 1.2, pose.head[1] + (dy / len) * 1.2], pose.facing, options.phase ?? DEFAULT_PHASE))
 
   props.forEach(p => out.push(...propPrimitives(p, 'front')))
   return out
@@ -601,8 +330,6 @@ export const figureToSvg = (
   size = 200,
   background?: string,
 ) => {
-  const paint = (c: ColorRole | 'none') => (c === 'none' ? 'none' : colors[c])
-  const strokeAttr = (p: Stroke) => (p.stroke ? ` stroke="${colors[p.stroke]}" stroke-width="${p.sw ?? 1}" stroke-linejoin="round" stroke-linecap="round"` : '')
   const body = primitives
     .map(p => {
       const op = 'opacity' in p && p.opacity !== undefined ? ` opacity="${p.opacity}"` : ''
@@ -610,13 +337,13 @@ export const figureToSvg = (
         case 'line':
           return `<polyline points="${p.points.map(pt => pt.join(',')).join(' ')}" fill="none" stroke="${colors[p.color]}" stroke-width="${p.width}" stroke-linecap="round" stroke-linejoin="round"/>`
         case 'circle':
-          return `<circle cx="${p.c[0]}" cy="${p.c[1]}" r="${p.r}" fill="${paint(p.color)}"${op}${strokeAttr(p)}/>`
+          return `<circle cx="${p.c[0]}" cy="${p.c[1]}" r="${p.r}" fill="${colors[p.color]}"${op}/>`
         case 'ellipse':
-          return `<ellipse cx="${p.c[0]}" cy="${p.c[1]}" rx="${p.rx}" ry="${p.ry}" fill="${paint(p.color)}"${op}${strokeAttr(p)}/>`
+          return `<ellipse cx="${p.c[0]}" cy="${p.c[1]}" rx="${p.rx}" ry="${p.ry}" fill="${colors[p.color]}"${op}/>`
         case 'rect':
-          return `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.r}" fill="${paint(p.color)}"${strokeAttr(p)}/>`
+          return `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${p.r}" fill="${colors[p.color]}"/>`
         case 'path':
-          return `<path d="${p.d}" fill="${paint(p.color)}"${op}${strokeAttr(p)}/>`
+          return `<path d="${p.d}" fill="${colors[p.color]}"${op}/>`
       }
     })
     .join('')

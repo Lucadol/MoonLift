@@ -1,6 +1,6 @@
 # Moony WOD
 
-Application de timer pour l'entraînement fonctionnel (Expo / React Native), avec gestion de programme et suivi des records personnels. Sa mascotte, Moony, est un petit athlète à tête de lune. Historique des versions : [VERSIONS.md](VERSIONS.md).
+Application de timer pour l'entraînement fonctionnel (Expo / React Native), avec gestion de programme et suivi des records personnels. Sa mascotte, Moony, est une silhouette d'athlète à tête de lune. Historique des versions : [VERSIONS.md](VERSIONS.md).
 
 ## Fonctionnalités
 
@@ -11,7 +11,8 @@ Application de timer pour l'entraînement fonctionnel (Expo / React Native), ave
 - **FOR TIME** : chrono avec time cap et bouton « Terminé »
 - **MIX** : enchaîne plusieurs blocs (AMRAP, EMOM, Tabata, For Time, repos), avec un résultat par bloc
 - 10 s de préparation, bips et vibrations sur les 3 dernières secondes et à chaque changement de phase
-- Écran en couleur pendant le travail, mascotte animée, pause / reprise, « Passer le repos », écran maintenu allumé
+- Écran en couleur pendant le travail, pause / reprise, « Passer le repos », écran maintenu allumé
+- **La lune de Moony suit le timer** : elle se remplit pendant le travail (sur tout l'AMRAP / For Time, à chaque tour d'EMOM / Tabata), décroît pendant la préparation et le repos, et devient pleine à la fin
 - Annonces vocales (« C'est parti », « Repos », « Dernier tour », « Plus qu'une minute »…), désactivables
 
 ### Programme
@@ -45,7 +46,7 @@ Application de timer pour l'entraînement fonctionnel (Expo / React Native), ave
 ### Apparence
 - Thème clair (fond beige), sombre ou automatique
 - 4 palettes : Terre cuite, Sauge & caramel, Nuit & corail, Encre & lin
-- Moony présent sur chaque écran (14 poses, expressions, respiration et clignement des yeux) et utilisé comme logo
+- Moony présent sur chaque écran (14 poses) et utilisé comme logo ; il prend la couleur lisible du fond sur lequel il est posé
 - Une phrase de motivation différente à chaque ouverture de l'app
 
 Les données sont enregistrées localement sur le téléphone (AsyncStorage).
@@ -71,7 +72,7 @@ src/utils/records.ts            meilleur record, charges en %, détection de nou
 src/utils/history.ts            calendrier et séries de semaines
 src/utils/backup.ts             export / restauration des données
 src/constants                   nom de l'app, phrases de motivation
-src/components/mascot           Moony (poses vectorielles, visage, animation)
+src/components/mascot           Moony (poses vectorielles, phases de lune, respiration)
 src/components                  composants réutilisables
 src/screens                     écrans timer, programme, records, historique et réglages
 ```

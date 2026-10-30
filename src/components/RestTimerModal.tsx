@@ -94,7 +94,13 @@ const RestTimerModal = ({ visible, exerciseName, defaultSec, onClose }: RestTime
           </View>
 
           <View style={styles.center}>
-            <Mascot pose={running ? (remainingSec % 2 ? 'rest' : 'restBreath') : 'wave'} size={110} backdrop />
+            {/* Pendant le repos, la lune de Moony décroît jusqu'à la reprise */}
+            <Mascot
+              pose={running ? (remainingSec % 2 ? 'rest' : 'restBreath') : 'wave'}
+              phase={running && endsAt !== null ? Math.max(0, endsAt - now) / (duration * 1000) : undefined}
+              size={110}
+              backdrop
+            />
             <Text style={[styles.clock, running && { color: theme.colors.quaternary }]}>{formatClock(remainingSec)}</Text>
           </View>
 

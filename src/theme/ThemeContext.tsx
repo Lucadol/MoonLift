@@ -35,33 +35,35 @@ export interface Theme {
   fonts: typeof fonts
 }
 
-// Couleurs de Moony : corps clair cerné d'encre, identique en thème clair et sombre
-export const buildMascotColors = (accents: Accents, backdrop: string): Record<ColorRole, string> => {
-  const ink = '#2B2622'
-  const fill = '#FFFDF8'
+// Couleurs de Moony sur le fond de l'app (beige ou sombre) : silhouette encre, tête de lune colorée
+export const buildMascotColors = (
+  accents: Accents,
+  base: (typeof neutrals)['light'],
+): Record<ColorRole, string> => ({
+  ink: base.text,
+  far: mix(base.text, base.background, 0.62),
+  moon: accents.moon,
+  moonShade: mix(accents.moon, base.surface, 0.72),
+  accent: accents.secondary,
+  gold: accents.tertiary,
+  shadow: base.text,
+  backdrop: base.surfaceAlt,
+})
+
+// Moony posé sur un fond coloré (écran du timer, carte record) : tout dans la couleur lisible sur ce fond
+export const mascotColorsOn = (background: string): Record<ColorRole, string> => {
+  const ink = onColor(background)
   return {
     ink,
-    fill,
-    farFill: mix(fill, ink, 0.13),
-    moon: accents.moon,
-    band: accents.secondary !== accents.moon ? accents.secondary : accents.quaternary,
-    shoe: accents.primary,
-    accent: accents.secondary,
-    gold: accents.tertiary,
-    cheek: mix(accents.moon, '#FFFFFF', 0.35),
-    sweat: mix(accents.quaternary, '#FFFFFF', 0.45),
+    far: mix(ink, background, 0.55),
+    moon: ink,
+    moonShade: mix(ink, background, 0.66),
+    accent: mix(ink, background, 0.35),
+    gold: mix(ink, background, 0.35),
     shadow: ink,
-    backdrop,
-    moonPale: mix(accents.tertiary, '#FFFFFF', 0.55),
-    crater: mix(accents.tertiary, '#FFFFFF', 0.2),
+    backdrop: mix(background, ink, 0.12),
   }
 }
-
-// Moony posé sur un fond coloré (ex : écran du timer)
-export const mascotColorsOn = (theme: Theme, background: string): Record<ColorRole, string> => ({
-  ...theme.mascot,
-  backdrop: mix(background, onColor(background), 0.12),
-})
 
 export const buildTheme = (paletteId: PaletteId, mode: ColorMode): Theme => {
   const palette = palettes.find(p => p.id === paletteId) ?? palettes[0]
@@ -81,7 +83,7 @@ export const buildTheme = (paletteId: PaletteId, mode: ColorMode): Theme => {
       REST: base.textMuted,
     },
     phase: { prep: accents.tertiary, work: accents.primary, rest: accents.quaternary },
-    mascot: buildMascotColors(accents, base.surfaceAlt),
+    mascot: buildMascotColors(accents, base),
     fonts,
   }
 }

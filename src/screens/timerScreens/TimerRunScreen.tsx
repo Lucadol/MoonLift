@@ -286,6 +286,19 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
   else if (started && (inPrep || phase.kind === 'rest')) pose = Math.floor(elapsedMs / 900) % 2 ? 'restBreath' : 'rest'
   else if (started) pose = Math.floor(elapsedMs / 700) % 2 ? 'swingDown' : 'swingUp'
 
+  // La lune de Moony suit le timer :
+  // - préparation et repos : elle décroît, quand elle disparaît c'est reparti
+  // - EMOM / Tabata : elle se remplit pendant chaque tour, puis repart à zéro
+  // - AMRAP / For Time : elle se remplit sur toute la durée du bloc
+  // - terminé : pleine lune
+  let moonPhase: number | undefined
+  if (status === 'finished') moonPhase = 1
+  else if (started && inPrep) moonPhase = (PREP_MS - elapsedMs) / PREP_MS
+  else if (started) {
+    const phaseProgress = snapshot.phaseElapsedMs / (phase.durationSec * 1000)
+    moonPhase = phase.kind === 'rest' ? 1 - phaseProgress : phaseProgress
+  }
+
   const segment = segments[segmentIndex]
   const nextSegment = segments[segmentIndex + 1]
   const showRoundCounter = working && (segment.type === 'AMRAP' || segment.type === 'FOR_TIME')
@@ -314,6 +327,7 @@ const TimerRunScreen = ({ navigation, route }: TimerRunProps) => {
         <View style={styles.center}>
           <Mascot
             pose={pose}
+            phase={moonPhase}
             size={150}
             onBackground={background === theme.colors.background ? undefined : background}
           />
